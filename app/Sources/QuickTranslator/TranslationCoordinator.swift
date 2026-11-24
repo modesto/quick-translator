@@ -1,14 +1,20 @@
 import AppKit
 
+@MainActor
 final class TranslationCoordinator {
     private let translator = Translator()
+    private let appleTranslator = AppleTranslator()
     private let popup = PopupController()
     private var targetApplication: NSRunningApplication?
 
     init() {
-        popup.onChoose = { [weak self] variant in self?.apply(variant) }
-        popup.onClose = { [weak self] in self?.translator.cancel() }
+        popup.onChoose = { [weak self] text in self?.apply(text) }
+        popup.onClose = { [weak self] in
+            self?.translator.cancel()
+            self?.appleTranslator.cancel()
+        }
         translator.start()
+        appleTranslator.warmUp()
     }
 
     func translateCurrentSelection() {
@@ -35,18 +41,22 @@ final class TranslationCoordinator {
 
     private func start(text: String, anchor: NSRect?) {
         popup.showLoading(original: text, anchor: anchor)
+        appleTranslator.translate(text) { [weak self] result in
+            switch result {
+            case .success(let translation): self?.popup.showApple(.done(translation))
+            case .failure(let error): self?.popup.showApple(.failed(error.localizedDescription))
+            }
+        }
         translator.translate(text) { [weak self] result in
             switch result {
-            case .success(let translation):
-                self?.popup.showResult(translation)
-            case .failure(let error):
-                self?.popup.showError(error.localizedDescription)
+            case .success(let response): self?.popup.showClaude(.done(response))
+            case .failure(let error): self?.popup.showClaude(.failed(error.localizedDescription))
             }
         }
     }
 
-    private func apply(_ variant: TranslationVariant) {
+    private func apply(_ text: String) {
         popup.close()
-        TextReplacer.replaceSelection(with: variant.text, in: targetApplication)
+        TextReplacer.replaceSelection(with: text, in: targetApplication)
     }
 }

@@ -47,7 +47,7 @@ export async function runServer(engine: EngineOptions, defaultCount: number): Pr
     translator
       .translate(request.text, { targetLanguage: request.to, count: request.count ?? defaultCount })
       .then(
-        (result) => send({ id: request.id, result }),
+        (result) => send({ id: request.id, model: engine.model, result }),
         (error: unknown) => send({ id: request.id, error: error instanceof Error ? error.message : String(error) }),
       );
   }

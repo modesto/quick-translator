@@ -1,28 +1,42 @@
 import AppKit
 import SwiftUI
 
-final class PopupModel: ObservableObject {
-    enum State {
-        case loading
-        case result(TranslationResult)
-        case error(String)
-    }
+enum ProviderState<Value> {
+    case loading
+    case done(Value)
+    case failed(String)
+}
 
+final class PopupModel: ObservableObject {
     @Published var original = ""
-    @Published var state: State = .loading
-    var onChoose: (TranslationVariant) -> Void = { _ in }
+    @Published var apple: ProviderState<AppleTranslation> = .loading
+    @Published var claude: ProviderState<ClaudeTranslation> = .loading
+    var onChoose: (String) -> Void = { _ in }
     var onClose: () -> Void = {}
+
+    static let appleKey = 1
+    static let firstClaudeKey = 2
+
+    func text(forKey key: Int) -> String? {
+        if key == Self.appleKey, case .done(let translation) = apple { return translation.text }
+        if case .done(let translation) = claude {
+            let index = key - Self.firstClaudeKey
+            if translation.result.variants.indices.contains(index) { return translation.result.variants[index].text }
+        }
+        return nil
+    }
 }
 
 private final class PopupPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }
 
+@MainActor
 final class PopupController {
-    var onChoose: (TranslationVariant) -> Void = { _ in }
+    var onChoose: (String) -> Void = { _ in }
     var onClose: () -> Void = {}
 
-    private static let width: CGFloat = 420
+    private static let width: CGFloat = 440
     private let model = PopupModel()
     private var panel: PopupPanel?
     private var anchor: NSRect = .zero
@@ -30,23 +44,24 @@ final class PopupController {
     private var clickMonitor: Any?
 
     init() {
-        model.onChoose = { [weak self] variant in self?.onChoose(variant) }
+        model.onChoose = { [weak self] text in self?.onChoose(text) }
         model.onClose = { [weak self] in self?.close() }
     }
 
     func showLoading(original: String, anchor: NSRect?) {
         model.original = original
-        model.state = .loading
+        model.apple = .loading
+        model.claude = .loading
         present(anchor: anchor)
     }
 
-    func showResult(_ result: TranslationResult) {
-        model.state = .result(result)
+    func showApple(_ state: ProviderState<AppleTranslation>) {
+        model.apple = state
         resizeToFit()
     }
 
-    func showError(_ message: String) {
-        model.state = .error(message)
+    func showClaude(_ state: ProviderState<ClaudeTranslation>) {
+        model.claude = state
         resizeToFit()
     }
 
@@ -136,10 +151,9 @@ final class PopupController {
             close()
             return true
         }
-        guard case .result(let result) = model.state,
-              let digit = event.charactersIgnoringModifiers.flatMap(Int.init),
-              (1...result.variants.count).contains(digit) else { return false }
-        onChoose(result.variants[digit - 1])
+        guard let key = event.charactersIgnoringModifiers.flatMap(Int.init),
+              let text = model.text(forKey: key) else { return false }
+        onChoose(text)
         return true
     }
 }
@@ -151,7 +165,13 @@ private struct PopupView: View {
         VStack(alignment: .leading, spacing: 10) {
             header
             Divider()
-            content
+            ProviderSection(icon: "apple.logo", title: "Apple Translation", subtitle: appleSubtitle) {
+                appleContent
+            }
+            Divider()
+            ProviderSection(icon: "sparkles", title: claudeTitle, subtitle: claudeSubtitle) {
+                claudeContent
+            }
         }
         .padding(14)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -174,51 +194,132 @@ private struct PopupView: View {
         }
     }
 
+    private var appleSubtitle: String {
+        if case .done(let translation) = model.apple {
+            return "En el Mac · \(translation.sourceLanguage) → \(translation.targetLanguage)"
+        }
+        return "En el Mac"
+    }
+
+    private var claudeTitle: String {
+        if case .done(let translation) = model.claude, let modelID = translation.model {
+            return Self.displayName(forModel: modelID)
+        }
+        return "Claude"
+    }
+
+    private var claudeSubtitle: String {
+        if case .done(let translation) = model.claude {
+            return "Claude Code · \(translation.result.sourceLanguage) → \(translation.result.targetLanguage)"
+        }
+        return "Claude Code"
+    }
+
     @ViewBuilder
-    private var content: some View {
-        switch model.state {
+    private var appleContent: some View {
+        switch model.apple {
         case .loading:
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text("Traduciendo…").foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        case .error(let message):
-            Label(message, systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.red)
-                .fixedSize(horizontal: false, vertical: true)
-        case .result(let result):
+            LoadingRow()
+        case .failed(let message):
+            FailureRow(message: message)
+        case .done(let translation):
+            VariantRow(key: PopupModel.appleKey, label: nil, text: translation.text) { model.onChoose(translation.text) }
+        }
+    }
+
+    @ViewBuilder
+    private var claudeContent: some View {
+        switch model.claude {
+        case .loading:
+            LoadingRow()
+        case .failed(let message):
+            FailureRow(message: message)
+        case .done(let translation):
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(result.sourceLanguage) → \(result.targetLanguage)")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                ForEach(Array(result.variants.enumerated()), id: \.element.id) { index, variant in
-                    VariantRow(index: index + 1, variant: variant) { model.onChoose(variant) }
+                ForEach(Array(translation.result.variants.enumerated()), id: \.element.id) { index, variant in
+                    VariantRow(key: PopupModel.firstClaudeKey + index, label: variant.label, text: variant.text) {
+                        model.onChoose(variant.text)
+                    }
                 }
             }
         }
     }
+
+    private static func displayName(forModel id: String) -> String {
+        let parts = id.split(separator: "-").map(String.init)
+        guard parts.count >= 2, parts[0] == "claude" else { return id }
+        let family = parts[1].capitalized
+        let version = parts.dropFirst(2).joined(separator: ".")
+        return version.isEmpty ? "Claude \(family)" : "Claude \(family) \(version)"
+    }
+}
+
+private struct ProviderSection<Content: View>: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.caption.weight(.bold))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            content
+        }
+    }
+}
+
+private struct LoadingRow: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text("Traduciendo…").foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct FailureRow: View {
+    let message: String
+
+    var body: some View {
+        Label(message, systemImage: "exclamationmark.triangle")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
 }
 
 private struct VariantRow: View {
-    let index: Int
-    let variant: TranslationVariant
+    let key: Int
+    let label: String?
+    let text: String
     let choose: () -> Void
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(variant.label)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text(variant.text)
+                if let label {
+                    Text(label)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                Text(text)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
-            Button("Usar \(index)", action: choose)
+            Button("Usar \(key)", action: choose)
                 .controlSize(.small)
-                .help("Sustituir la selección (tecla \(index))")
+                .help("Sustituir la selección (tecla \(key))")
         }
     }
 }

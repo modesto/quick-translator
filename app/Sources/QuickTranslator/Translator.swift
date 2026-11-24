@@ -12,6 +12,11 @@ struct TranslationResult: Decodable {
     let variants: [TranslationVariant]
 }
 
+struct ClaudeTranslation {
+    let result: TranslationResult
+    let model: String?
+}
+
 enum TranslatorError: LocalizedError {
     case notConfigured
     case serverStopped
@@ -36,12 +41,13 @@ private struct ServerRequest: Encodable {
 
 private struct ServerMessage: Decodable {
     let id: String?
+    let model: String?
     let result: TranslationResult?
     let error: String?
 }
 
 final class Translator {
-    typealias Completion = (Result<TranslationResult, Error>) -> Void
+    typealias Completion = (Result<ClaudeTranslation, Error>) -> Void
 
     private var process: Process?
     private var input: FileHandle?
@@ -123,7 +129,7 @@ final class Translator {
               let completion = pending.removeValue(forKey: id) else { return }
         if currentRequestID == id { currentRequestID = nil }
         if let result = message.result {
-            completion(.success(result))
+            completion(.success(ClaudeTranslation(result: result, model: message.model)))
         } else {
             completion(.failure(TranslatorError.failed(message.error ?? "La traducción falló.")))
         }
