@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 enum ProviderState<Value> {
+    case idle
     case loading
     case done(Value)
     case failed(String)
@@ -13,6 +14,7 @@ final class PopupModel: ObservableObject {
     @Published var claude: ProviderState<ClaudeTranslation> = .loading
     var onChoose: (String) -> Void = { _ in }
     var onClose: () -> Void = {}
+    var onRequestClaude: () -> Void = {}
 
     static let appleKey = 1
     static let firstClaudeKey = 2
@@ -35,6 +37,7 @@ private final class PopupPanel: NSPanel {
 final class PopupController {
     var onChoose: (String) -> Void = { _ in }
     var onClose: () -> Void = {}
+    var onRequestClaude: () -> Void = {}
 
     private static let width: CGFloat = 440
     private let model = PopupModel()
@@ -46,12 +49,13 @@ final class PopupController {
     init() {
         model.onChoose = { [weak self] text in self?.onChoose(text) }
         model.onClose = { [weak self] in self?.close() }
+        model.onRequestClaude = { [weak self] in self?.onRequestClaude() }
     }
 
     func showLoading(original: String, anchor: NSRect?) {
         model.original = original
         model.apple = .loading
-        model.claude = .loading
+        model.claude = .idle
         present(anchor: anchor)
     }
 
@@ -151,6 +155,15 @@ final class PopupController {
             close()
             return true
         }
+        if event.charactersIgnoringModifiers?.lowercased() == "c" {
+            switch model.claude {
+            case .idle, .failed:
+                onRequestClaude()
+                return true
+            case .loading, .done:
+                return false
+            }
+        }
         guard let key = event.charactersIgnoringModifiers.flatMap(Int.init),
               let text = model.text(forKey: key) else { return false }
         onChoose(text)
@@ -218,7 +231,7 @@ private struct PopupView: View {
     @ViewBuilder
     private var appleContent: some View {
         switch model.apple {
-        case .loading:
+        case .idle, .loading:
             LoadingRow()
         case .failed(let message):
             FailureRow(message: message)
@@ -230,10 +243,15 @@ private struct PopupView: View {
     @ViewBuilder
     private var claudeContent: some View {
         switch model.claude {
+        case .idle:
+            ClaudeRequestButton(action: model.onRequestClaude)
         case .loading:
             LoadingRow()
         case .failed(let message):
-            FailureRow(message: message)
+            VStack(alignment: .leading, spacing: 8) {
+                FailureRow(message: message)
+                ClaudeRequestButton(title: "Reintentar con Claude", action: model.onRequestClaude)
+            }
         case .done(let translation):
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(translation.result.variants.enumerated()), id: \.element.id) { index, variant in
@@ -274,6 +292,19 @@ private struct ProviderSection<Content: View>: View {
             }
             content
         }
+    }
+}
+
+private struct ClaudeRequestButton: View {
+    var title = "Traducir con Claude"
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("\(title)  (C)", systemImage: "sparkles")
+        }
+        .controlSize(.small)
+        .help("Pedir varias versiones a Claude (tecla C)")
     }
 }
 

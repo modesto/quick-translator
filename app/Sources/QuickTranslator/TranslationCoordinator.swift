@@ -6,9 +6,11 @@ final class TranslationCoordinator {
     private let appleTranslator = AppleTranslator()
     private let popup = PopupController()
     private var targetApplication: NSRunningApplication?
+    private var currentText = ""
 
     init() {
         popup.onChoose = { [weak self] text in self?.apply(text) }
+        popup.onRequestClaude = { [weak self] in self?.requestClaude() }
         popup.onClose = { [weak self] in
             self?.translator.cancel()
             self?.appleTranslator.cancel()
@@ -40,6 +42,8 @@ final class TranslationCoordinator {
     }
 
     private func start(text: String, anchor: NSRect?) {
+        translator.cancel()
+        currentText = text
         popup.showLoading(original: text, anchor: anchor)
         appleTranslator.translate(text) { [weak self] result in
             switch result {
@@ -47,7 +51,11 @@ final class TranslationCoordinator {
             case .failure(let error): self?.popup.showApple(.failed(error.localizedDescription))
             }
         }
-        translator.translate(text) { [weak self] result in
+    }
+
+    private func requestClaude() {
+        popup.showClaude(.loading)
+        translator.translate(currentText) { [weak self] result in
             switch result {
             case .success(let response): self?.popup.showClaude(.done(response))
             case .failure(let error): self?.popup.showClaude(.failed(error.localizedDescription))
