@@ -16,7 +16,12 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$ROOT/app/.build/release/QuickTranslator" "$APP/Contents/MacOS/QuickTranslator"
 sed -e "s|__NODE_PATH__|$NODE_PATH|" -e "s|__CLI_PATH__|$CLI_PATH|" \
     "$ROOT/app/Resources/Info.plist.template" > "$APP/Contents/Info.plist"
-codesign --force --sign - "$APP"
+IDENTITY="${CODESIGN_IDENTITY:--}"
+if [[ "$IDENTITY" != "-" ]] && ! security find-identity -v -p codesigning | grep -qF "\"$IDENTITY\""; then
+    echo "Signing identity '$IDENTITY' not found; using ad-hoc signature" >&2
+    IDENTITY="-"
+fi
+codesign --force --sign "$IDENTITY" "$APP"
 
 echo "Built: $APP"
 

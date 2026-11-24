@@ -8,10 +8,12 @@ final class TranslationCoordinator {
     init() {
         popup.onChoose = { [weak self] variant in self?.apply(variant) }
         popup.onClose = { [weak self] in self?.translator.cancel() }
+        translator.start()
     }
 
     func translateCurrentSelection() {
         guard Accessibility.isTrusted else {
+            NSSound.beep()
             Accessibility.requestTrustIfNeeded()
             return
         }

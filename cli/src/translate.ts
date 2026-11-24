@@ -1,11 +1,16 @@
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import { query, startup, type Options, type Query, type WarmQuery } from "@anthropic-ai/claude-agent-sdk";
 
-export interface TranslateOptions {
-  targetLanguage?: string;
-  count: number;
+export interface EngineOptions {
   model: string;
   effort: "low" | "medium" | "high";
 }
+
+export interface RequestOptions {
+  targetLanguage?: string;
+  count: number;
+}
+
+export type TranslateOptions = EngineOptions & RequestOptions;
 
 export interface TranslationVariant {
   label: string;
@@ -50,12 +55,26 @@ Rules:
 - "label" is a short name for the style (one or two words) written in Spanish, e.g. "Literal", "Natural", "Formal", "Informal", "Conciso".
 - "sourceLanguage" and "targetLanguage" are English names of the languages, e.g. "Spanish", "English".`;
 
-function buildPrompt(text: string, options: TranslateOptions): string {
-  const target = options.targetLanguage
-    ? `Target language: ${options.targetLanguage}.`
+function queryOptions(engine: EngineOptions): Options {
+  return {
+    model: engine.model,
+    effort: engine.effort,
+    systemPrompt: SYSTEM_PROMPT,
+    tools: [],
+    settingSources: [],
+    persistSession: false,
+    maxTurns: 3,
+    outputFormat: { type: "json_schema", schema: RESULT_SCHEMA },
+    env: { ...process.env, CLAUDE_AGENT_SDK_CLIENT_APP: "quick-translate/0.1.0" },
+  };
+}
+
+function buildPrompt(text: string, request: RequestOptions): string {
+  const target = request.targetLanguage
+    ? `Target language: ${request.targetLanguage}.`
     : "Target language: English if the text is in Spanish; otherwise Spanish.";
   return `${target}
-Number of variants: ${options.count}.
+Number of variants: ${request.count}.
 
 <text>
 ${text}
@@ -79,22 +98,7 @@ function isTranslationResult(value: unknown): value is TranslationResult {
   );
 }
 
-export async function translate(text: string, options: TranslateOptions): Promise<TranslationResult> {
-  const stream = query({
-    prompt: buildPrompt(text, options),
-    options: {
-      model: options.model,
-      effort: options.effort,
-      systemPrompt: SYSTEM_PROMPT,
-      tools: [],
-      settingSources: [],
-      persistSession: false,
-      maxTurns: 3,
-      outputFormat: { type: "json_schema", schema: RESULT_SCHEMA },
-      env: { ...process.env, CLAUDE_AGENT_SDK_CLIENT_APP: "quick-translate/0.1.0" },
-    },
-  });
-
+async function collectResult(stream: Query): Promise<TranslationResult> {
   for await (const message of stream) {
     if (message.type !== "result") continue;
     if (message.subtype !== "success") {
@@ -105,6 +109,52 @@ export async function translate(text: string, options: TranslateOptions): Promis
     }
     return message.structured_output;
   }
-
   throw new Error("Translation ended without a result");
+}
+
+export async function translate(text: string, options: TranslateOptions): Promise<TranslationResult> {
+  return collectResult(query({ prompt: buildPrompt(text, options), options: queryOptions(options) }));
+}
+
+export class WarmTranslator {
+  private spare: Promise<WarmQuery> | undefined;
+
+  constructor(private readonly engine: EngineOptions) {}
+
+  warmUp(): Promise<WarmQuery> {
+    if (!this.spare) {
+      const spare = startup({ options: queryOptions(this.engine) });
+      spare.catch(() => {
+        if (this.spare === spare) this.spare = undefined;
+      });
+      this.spare = spare;
+    }
+    return this.spare;
+  }
+
+  async translate(text: string, request: RequestOptions): Promise<TranslationResult> {
+    const warm = await this.takeSpare();
+    this.warmUp();
+    return collectResult(warm.query(buildPrompt(text, request)));
+  }
+
+  async close(): Promise<void> {
+    const spare = this.spare;
+    this.spare = undefined;
+    (await spare?.catch(() => undefined))?.close();
+  }
+
+  private async takeSpare(): Promise<WarmQuery> {
+    try {
+      return await this.claim();
+    } catch {
+      return this.claim();
+    }
+  }
+
+  private async claim(): Promise<WarmQuery> {
+    const spare = this.warmUp();
+    this.spare = undefined;
+    return spare;
+  }
 }

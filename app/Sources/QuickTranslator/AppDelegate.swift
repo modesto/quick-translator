@@ -50,8 +50,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 enum Accessibility {
     static var isTrusted: Bool { AXIsProcessTrusted() }
+    private static var hasPrompted = false
 
     static func requestTrustIfNeeded() {
+        guard !hasPrompted, !isTrusted else { return }
+        hasPrompted = true
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
     }

@@ -14,77 +14,129 @@ struct TranslationResult: Decodable {
 
 enum TranslatorError: LocalizedError {
     case notConfigured
+    case serverStopped
     case failed(String)
 
     var errorDescription: String? {
         switch self {
         case .notConfigured:
             return "No se encuentra el CLI quick-translate (QTNodePath / QTCLIPath en Info.plist)."
+        case .serverStopped:
+            return "El proceso de traducción se ha detenido. Vuelve a intentarlo."
         case .failed(let message):
             return message
         }
     }
 }
 
+private struct ServerRequest: Encodable {
+    let id: String
+    let text: String
+}
+
+private struct ServerMessage: Decodable {
+    let id: String?
+    let result: TranslationResult?
+    let error: String?
+}
+
 final class Translator {
+    typealias Completion = (Result<TranslationResult, Error>) -> Void
+
     private var process: Process?
+    private var input: FileHandle?
+    private var buffer = Data()
+    private var pending: [String: Completion] = [:]
+    private var currentRequestID: String?
 
     private var nodePath: String? { Bundle.main.object(forInfoDictionaryKey: "QTNodePath") as? String }
     private var cliPath: String? { Bundle.main.object(forInfoDictionaryKey: "QTCLIPath") as? String }
 
-    func translate(_ text: String, completion: @escaping (Result<TranslationResult, Error>) -> Void) {
+    func start() {
+        guard process == nil else { return }
+        try? launchServer()
+    }
+
+    func translate(_ text: String, completion: @escaping Completion) {
         cancel()
+        do {
+            if process == nil { try launchServer() }
+            let id = UUID().uuidString
+            var line = try JSONEncoder().encode(ServerRequest(id: id, text: text))
+            line.append(0x0A)
+            pending[id] = completion
+            currentRequestID = id
+            try input?.write(contentsOf: line)
+        } catch {
+            completion(.failure(error))
+        }
+    }
+
+    func cancel() {
+        if let currentRequestID { pending[currentRequestID] = nil }
+        currentRequestID = nil
+    }
+
+    private func launchServer() throws {
         guard let nodePath, let cliPath,
               FileManager.default.isExecutableFile(atPath: nodePath),
               FileManager.default.fileExists(atPath: cliPath) else {
-            completion(.failure(TranslatorError.notConfigured))
-            return
+            throw TranslatorError.notConfigured
         }
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: nodePath)
-        process.arguments = [cliPath]
-        let input = Pipe()
-        let output = Pipe()
-        let errorOutput = Pipe()
-        process.standardInput = input
-        process.standardOutput = output
-        process.standardError = errorOutput
+        process.arguments = [cliPath, "--server"]
+        let inputPipe = Pipe()
+        let outputPipe = Pipe()
+        process.standardInput = inputPipe
+        process.standardOutput = outputPipe
+        process.standardError = FileHandle.nullDevice
 
+        outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            DispatchQueue.main.async { self?.receive(data) }
+        }
         process.terminationHandler = { [weak self] finished in
-            let stdout = output.fileHandleForReading.readDataToEndOfFile()
-            let stderr = errorOutput.fileHandleForReading.readDataToEndOfFile()
-            let result = Self.parse(status: finished.terminationStatus, reason: finished.terminationReason, stdout: stdout, stderr: stderr)
-            DispatchQueue.main.async {
-                guard self?.process === finished else { return }
-                self?.process = nil
-                completion(result)
-            }
+            DispatchQueue.main.async { self?.serverDidStop(finished) }
         }
 
-        do {
-            try process.run()
-        } catch {
-            completion(.failure(error))
-            return
-        }
+        try process.run()
         self.process = process
-        input.fileHandleForWriting.write(Data(text.utf8))
-        try? input.fileHandleForWriting.close()
+        self.input = inputPipe.fileHandleForWriting
+        buffer.removeAll()
     }
 
-    func cancel() {
-        guard let process else { return }
-        self.process = nil
-        if process.isRunning { process.terminate() }
-    }
-
-    private static func parse(status: Int32, reason: Process.TerminationReason, stdout: Data, stderr: Data) -> Result<TranslationResult, Error> {
-        if status == 0, let result = try? JSONDecoder().decode(TranslationResult.self, from: stdout) {
-            return .success(result)
+    private func receive(_ data: Data) {
+        guard !data.isEmpty else { return }
+        buffer.append(data)
+        while let newline = buffer.firstIndex(of: 0x0A) {
+            let line = buffer[buffer.startIndex..<newline]
+            buffer.removeSubrange(buffer.startIndex...newline)
+            handle(line: Data(line))
         }
-        let message = (try? JSONDecoder().decode([String: String].self, from: stderr))?["error"]
-            ?? String(data: stderr, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return .failure(TranslatorError.failed(message?.isEmpty == false ? message! : "La traducción falló (código \(status))."))
+    }
+
+    private func handle(line: Data) {
+        guard let message = try? JSONDecoder().decode(ServerMessage.self, from: line),
+              let id = message.id,
+              let completion = pending.removeValue(forKey: id) else { return }
+        if currentRequestID == id { currentRequestID = nil }
+        if let result = message.result {
+            completion(.success(result))
+        } else {
+            completion(.failure(TranslatorError.failed(message.error ?? "La traducción falló.")))
+        }
+    }
+
+    private func serverDidStop(_ finished: Process) {
+        guard finished === process else { return }
+        process = nil
+        input = nil
+        buffer.removeAll()
+        let waiting = pending.values
+        pending.removeAll()
+        currentRequestID = nil
+        waiting.forEach { $0(.failure(TranslatorError.serverStopped)) }
     }
 }

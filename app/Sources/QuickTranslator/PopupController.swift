@@ -25,6 +25,7 @@ final class PopupController {
     private static let width: CGFloat = 420
     private let model = PopupModel()
     private var panel: PopupPanel?
+    private var anchor: NSRect = .zero
     private var keyMonitor: Any?
     private var clickMonitor: Any?
 
@@ -58,10 +59,10 @@ final class PopupController {
     }
 
     private func present(anchor: NSRect?) {
+        self.anchor = anchor ?? NSRect(origin: NSEvent.mouseLocation, size: .zero)
         let panel = self.panel ?? makePanel()
         self.panel = panel
         resizeToFit()
-        panel.setFrameOrigin(origin(for: panel.frame.size, anchor: anchor))
         panel.makeKeyAndOrderFront(nil)
         installMonitors()
     }
@@ -87,23 +88,30 @@ final class PopupController {
     private func resizeToFit() {
         guard let panel, let content = panel.contentView else { return }
         content.layoutSubtreeIfNeeded()
-        let size = content.fittingSize
-        var frame = panel.frame
-        frame.origin.y += frame.height - size.height
-        frame.size = NSSize(width: Self.width, height: size.height)
-        panel.setFrame(frame, display: true)
+        let size = NSSize(width: Self.width, height: content.fittingSize.height)
+        panel.setFrame(NSRect(origin: origin(for: size), size: size), display: true)
     }
 
-    private func origin(for size: NSSize, anchor: NSRect?) -> NSPoint {
-        let reference = anchor ?? NSRect(origin: NSEvent.mouseLocation, size: .zero)
-        let screen = NSScreen.screens.first { $0.frame.contains(reference.origin) } ?? NSScreen.main
+    private func origin(for size: NSSize) -> NSPoint {
+        let margin: CGFloat = 8
+        let gap: CGFloat = 6
+        let center = NSPoint(x: anchor.midX, y: anchor.midY)
+        let screen = NSScreen.screens.first { $0.frame.contains(center) } ?? NSScreen.main
         let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
 
-        var origin = NSPoint(x: reference.minX, y: reference.minY - size.height - 6)
-        if origin.y < visible.minY { origin.y = reference.maxY + 6 }
-        origin.x = min(max(origin.x, visible.minX + 8), visible.maxX - size.width - 8)
-        origin.y = min(max(origin.y, visible.minY + 8), visible.maxY - size.height - 8)
-        return origin
+        let spaceBelow = anchor.minY - visible.minY - margin - gap
+        let spaceAbove = visible.maxY - anchor.maxY - margin - gap
+        let y: CGFloat
+        if size.height <= spaceBelow {
+            y = anchor.minY - gap - size.height
+        } else if size.height <= spaceAbove {
+            y = anchor.maxY + gap
+        } else {
+            y = visible.maxY - margin - size.height
+        }
+
+        let x = min(max(anchor.minX, visible.minX + margin), visible.maxX - margin - size.width)
+        return NSPoint(x: x, y: max(y, visible.minY + margin))
     }
 
     private func installMonitors() {
