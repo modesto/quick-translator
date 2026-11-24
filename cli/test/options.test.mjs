@@ -8,6 +8,8 @@ describe("parseOptions", () => {
     assert.equal(parsed.text, undefined);
     assert.equal(parsed.help, false);
     assert.equal(parsed.server, false);
+    assert.equal(parsed.provider, "claude-code");
+    assert.equal(parsed.apiModel, "claude-haiku-5-5");
     assert.deepEqual(parsed.options, {
       targetLanguage: undefined,
       languagePair: { mine: "Spanish", target: "English" },
@@ -57,6 +59,17 @@ describe("parseOptions", () => {
 
   it("rejects the same language on both sides", () => {
     assert.throws(() => parseOptions(["--target", "spanish"]), /must be different languages/);
+  });
+
+  it("reads the provider and the Claude API model", () => {
+    const parsed = parseOptions(["-p", "claude-api", "--api-model", "claude-sonnet-5-5"]);
+    assert.equal(parsed.provider, "claude-api");
+    assert.equal(parsed.apiModel, "claude-sonnet-5-5");
+    assert.equal(parseOptions(["--provider", "deepl"]).provider, "deepl");
+  });
+
+  it("rejects an unknown provider", () => {
+    assert.throws(() => parseOptions(["--provider", "google"]), /--provider must be one of/);
   });
 
   it("rejects an unknown effort", () => {

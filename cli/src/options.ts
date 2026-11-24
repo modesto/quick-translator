@@ -1,4 +1,6 @@
 import { parseArgs } from "node:util";
+import { DEFAULT_API_MODEL } from "./claudeApi.js";
+import { DEFAULT_PROVIDER, isProviderId, PROVIDER_IDS, type ProviderId } from "./providers.js";
 import { DEFAULT_LANGUAGE_PAIR, type TranslateOptions } from "./translate.js";
 
 export const DEFAULT_MODEL = "claude-haiku-5-5";
@@ -10,6 +12,8 @@ export interface CliOptions {
   options: TranslateOptions;
   help: boolean;
   server: boolean;
+  provider: ProviderId;
+  apiModel: string;
 }
 
 export function isValidCount(count: unknown): count is number {
@@ -29,6 +33,8 @@ export function parseOptions(args: string[]): CliOptions {
       effort: { type: "string", short: "e" },
       help: { type: "boolean", short: "h" },
       server: { type: "boolean", short: "s" },
+      provider: { type: "string", short: "p" },
+      "api-model": { type: "string" },
     },
   });
 
@@ -40,6 +46,11 @@ export function parseOptions(args: string[]): CliOptions {
   const count = values.count === undefined ? DEFAULT_COUNT : Number(values.count);
   if (!isValidCount(count)) {
     throw new Error(`--count must be an integer between 1 and ${MAX_COUNT}`);
+  }
+
+  const provider = values.provider ?? DEFAULT_PROVIDER;
+  if (!isProviderId(provider)) {
+    throw new Error(`--provider must be one of ${PROVIDER_IDS.join(", ")}`);
   }
 
   const languagePair = {
@@ -54,6 +65,8 @@ export function parseOptions(args: string[]): CliOptions {
     text: positionals.length > 0 ? positionals.join(" ") : undefined,
     help: values.help ?? false,
     server: values.server ?? false,
+    provider,
+    apiModel: values["api-model"] ?? DEFAULT_API_MODEL,
     options: {
       targetLanguage: values.to,
       languagePair,

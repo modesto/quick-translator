@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildPrompt } from "../dist/translate.js";
+import { buildPrompt, claudeCodeEnv } from "../dist/translate.js";
 
 describe("buildPrompt", () => {
   it("defaults to Spanish as your language and English as the target", () => {
@@ -22,5 +22,12 @@ describe("buildPrompt", () => {
     const prompt = buildPrompt("línea 1\nlínea 2", { count: 3 });
     assert.match(prompt, /Number of variants: 3\./);
     assert.match(prompt, /<text>\nlínea 1\nlínea 2\n<\/text>/);
+  });
+});
+
+describe("claudeCodeEnv", () => {
+  it("keeps the environment, names the client and hides the other providers' keys", () => {
+    const env = claudeCodeEnv({ PATH: "/bin", HOME: "/Users/me", QT_ANTHROPIC_API_KEY: "sk", QT_DEEPL_AUTH_KEY: "k" });
+    assert.deepEqual(env, { PATH: "/bin", HOME: "/Users/me", CLAUDE_AGENT_SDK_CLIENT_APP: "quick-translate/0.1.0" });
   });
 });

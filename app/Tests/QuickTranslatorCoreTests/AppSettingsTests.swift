@@ -71,4 +71,30 @@ struct AppSettingsTests {
         defaults.set(try JSONEncoder().encode(LanguagePair(mine: "es", target: "es")), forKey: AppSettings.languagePairKey)
         #expect(AppSettings(defaults: defaults).languagePair == .default)
     }
+
+    @Test("uses Claude Code and Haiku 5.5 until something else is chosen")
+    func providerDefaults() {
+        let settings = AppSettings(defaults: Self.freshDefaults())
+        #expect(settings.provider == .claudeCode)
+        #expect(settings.claudeAPIModel == "claude-haiku-5-5")
+    }
+
+    @Test("remembers the provider and the Claude API model")
+    func persistsProvider() {
+        let defaults = Self.freshDefaults()
+        let settings = AppSettings(defaults: defaults)
+        settings.provider = .deepL
+        settings.claudeAPIModel = "claude-sonnet-5-5"
+        #expect(AppSettings(defaults: defaults).provider == .deepL)
+        #expect(AppSettings(defaults: defaults).claudeAPIModel == "claude-sonnet-5-5")
+    }
+
+    @Test("ignores an unknown provider or model")
+    func ignoresUnknownProvider() {
+        let defaults = Self.freshDefaults()
+        defaults.set("google", forKey: AppSettings.providerKey)
+        defaults.set("gpt-5", forKey: AppSettings.claudeAPIModelKey)
+        #expect(AppSettings(defaults: defaults).provider == .claudeCode)
+        #expect(AppSettings(defaults: defaults).claudeAPIModel == "claude-haiku-5-5")
+    }
 }

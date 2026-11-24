@@ -1,4 +1,5 @@
 import { query, startup, type Options, type Query, type WarmQuery } from "@anthropic-ai/claude-agent-sdk";
+import { API_KEY_ENV, type TranslationProvider } from "./providers.js";
 
 export interface EngineOptions {
   model: string;
@@ -53,7 +54,7 @@ const RESULT_SCHEMA = {
   },
 };
 
-const SYSTEM_PROMPT = `You are a translation engine used from a text-replacement popup. You never chat, ask questions or use tools other than returning the structured result.
+export const SYSTEM_PROMPT = `You are a translation engine used from a text-replacement popup. You never chat, ask questions or use tools other than returning the structured result.
 
 Given a text, return several distinct translations of it into the target language, each with a different register or nuance, for example: faithful/literal, natural, formal, casual, concise. Pick the styles that make the most sense for this text, and make sure every variant reads differently; do not return near-duplicates.
 
@@ -62,6 +63,12 @@ Rules:
 - Never add quotes, notes, explanations or transliterations to the variant text.
 - "label" is a short name for the style (one or two words) written in Spanish, e.g. "Literal", "Natural", "Formal", "Informal", "Conciso".
 - "sourceLanguage" and "targetLanguage" are English names of the languages, e.g. "Spanish", "English".`;
+
+export function claudeCodeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const result: NodeJS.ProcessEnv = { ...env, CLAUDE_AGENT_SDK_CLIENT_APP: "quick-translate/0.1.0" };
+  for (const name of Object.values(API_KEY_ENV)) delete result[name];
+  return result;
+}
 
 function queryOptions(engine: EngineOptions): Options {
   return {
@@ -73,7 +80,7 @@ function queryOptions(engine: EngineOptions): Options {
     persistSession: false,
     maxTurns: 3,
     outputFormat: { type: "json_schema", schema: RESULT_SCHEMA },
-    env: { ...process.env, CLAUDE_AGENT_SDK_CLIENT_APP: "quick-translate/0.1.0" },
+    env: claudeCodeEnv(process.env),
   };
 }
 
@@ -125,7 +132,13 @@ export async function translate(text: string, options: TranslateOptions): Promis
   return collectResult(query({ prompt: buildPrompt(text, options), options: queryOptions(options) }));
 }
 
-export class WarmTranslator {
+export class WarmTranslator implements TranslationProvider {
+  readonly id = "claude-code" as const;
+
+  get model(): string {
+    return this.engine.model;
+  }
+
   private spare: Promise<WarmQuery> | undefined;
 
   constructor(private readonly engine: EngineOptions) {}

@@ -12,7 +12,9 @@
     "test": "tsc && node --test test/"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.332"
+    "@anthropic-ai/claude-agent-sdk": "^0.3.332",
+    "@anthropic-ai/sdk": "^1.14.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "*",

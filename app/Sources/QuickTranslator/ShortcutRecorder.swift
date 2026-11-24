@@ -19,50 +19,28 @@ final class ShortcutRecorderModel: ObservableObject {
 }
 
 @MainActor
-final class ShortcutWindowController: NSObject, NSWindowDelegate {
+final class ShortcutRecorder {
     var onChange: (Shortcut) -> Void = { _ in }
 
+    let model: ShortcutRecorderModel
     private let manager: ShortcutManager
-    private let model: ShortcutRecorderModel
-    private var window: NSWindow?
     private var keyMonitor: Any?
 
     init(manager: ShortcutManager) {
         self.manager = manager
         model = ShortcutRecorderModel(current: manager.current)
-        super.init()
         model.onStartRecording = { [weak self] in self?.startRecording() }
         model.onCancelRecording = { [weak self] in self?.stopRecording() }
         model.onReset = { [weak self] in self?.apply(.default) }
     }
 
-    func show() {
-        let window = self.window ?? makeWindow()
-        self.window = window
+    func refresh() {
         model.current = manager.current
         model.message = nil
-        NSApp.activate()
-        window.center()
-        window.makeKeyAndOrderFront(nil)
     }
 
-    func windowWillClose(_ notification: Notification) {
+    func stop() {
         stopRecording()
-    }
-
-    private func makeWindow() -> NSWindow {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: 180),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Atajo de teclado"
-        window.isReleasedWhenClosed = false
-        window.level = .floating
-        window.delegate = self
-        window.contentView = NSHostingView(rootView: ShortcutRecorderView(model: model))
-        return window
     }
 
     private func startRecording() {
@@ -130,40 +108,35 @@ final class ShortcutWindowController: NSObject, NSWindowDelegate {
     }
 }
 
-private struct ShortcutRecorderView: View {
+struct ShortcutRecorderView: View {
     @ObservedObject var model: ShortcutRecorderModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Atajo para traducir la selección")
-                .font(.headline)
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
                 Text(model.isRecording ? "…" : model.current.displayString)
-                    .font(.system(size: 22, weight: .medium, design: .rounded))
-                    .frame(minWidth: 110, minHeight: 40)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary))
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .frame(minWidth: 80, minHeight: 26)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: 6)
                             .strokeBorder(model.isRecording ? Color.accentColor : .clear, lineWidth: 2)
                     )
                 if model.isRecording {
                     Button("Cancelar", action: model.onCancelRecording)
                 } else {
                     Button("Grabar nuevo atajo", action: model.onStartRecording)
-                        .keyboardShortcut(.defaultAction)
                 }
-            }
-            Text(model.message ?? " ")
-                .font(.callout)
-                .foregroundStyle(model.isError ? Color.red : Color.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Spacer()
-                Button("Restablecer (\(Shortcut.default.displayString))", action: model.onReset)
+                Button("Restablecer", action: model.onReset)
                     .disabled(model.isRecording || model.current == .default)
+                    .help("Volver a \(Shortcut.default.displayString)")
+            }
+            if let message = model.message {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(model.isError ? Color.red : Color.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(20)
-        .frame(width: 380)
     }
 }

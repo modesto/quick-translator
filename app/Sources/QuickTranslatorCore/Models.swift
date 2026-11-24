@@ -26,10 +26,14 @@ public struct TranslationResult: Decodable, Equatable, Sendable {
 public struct ClaudeTranslation: Equatable, Sendable {
     public let result: TranslationResult
     public let model: String?
+    public let provider: TranslationProviderKind
+    public let elapsed: TimeInterval?
 
-    public init(result: TranslationResult, model: String?) {
+    public init(result: TranslationResult, model: String?, provider: TranslationProviderKind = .claudeCode, elapsed: TimeInterval? = nil) {
         self.result = result
         self.model = model
+        self.provider = provider
+        self.elapsed = elapsed
     }
 }
 
@@ -58,6 +62,12 @@ public enum TranslatorError: LocalizedError, Equatable {
     case notConfigured
     case serverStopped
     case failed(String)
+    case provider(ProviderErrorCode, TranslationProviderKind, String)
+
+    public var opensSettings: Bool {
+        if case .provider(let code, _, _) = self { return code.opensSettings }
+        return false
+    }
 
     public var errorDescription: String? {
         switch self {
@@ -67,6 +77,8 @@ public enum TranslatorError: LocalizedError, Equatable {
             return "El proceso de traducción se ha detenido. Vuelve a intentarlo."
         case .failed(let message):
             return message
+        case .provider(let code, let provider, let detail):
+            return code.message(provider: provider, detail: detail)
         }
     }
 }

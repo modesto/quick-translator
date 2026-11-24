@@ -10,35 +10,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let coordinator: TranslationCoordinator
     private let hotKey: HotKey
     private let shortcuts: ShortcutManager
-    private let shortcutWindow: ShortcutWindowController
+    private let recorder: ShortcutRecorder
+    private let settingsWindow: SettingsWindowController
     private let serviceProvider = ServiceProvider()
 
     override init() {
         let settings = AppSettings()
-        let coordinator = TranslationCoordinator(settings: settings)
+        let secrets = KeychainSecretStore()
+        let translator = Translator(settings: settings, secrets: secrets)
+        let coordinator = TranslationCoordinator(settings: settings, translator: translator)
         let hotKey = HotKey { coordinator.translateCurrentSelection() }
         let shortcuts = ShortcutManager(settings: settings, hotKey: hotKey)
+        let recorder = ShortcutRecorder(manager: shortcuts)
+        let settingsModel = SettingsModel(
+            settings: settings,
+            secrets: secrets,
+            translator: translator,
+            shortcut: recorder.model,
+            onLanguagePairChange: { coordinator.languagePairDidChange() }
+        )
         self.settings = settings
         self.coordinator = coordinator
         self.hotKey = hotKey
         self.shortcuts = shortcuts
-        shortcutWindow = ShortcutWindowController(manager: shortcuts)
+        self.recorder = recorder
+        settingsWindow = SettingsWindowController(model: settingsModel, recorder: recorder)
         super.init()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        setUpMainMenu()
         setUpStatusItem()
+        recorder.onChange = { [weak self] shortcut in self?.updateTranslateItem(shortcut) }
+        coordinator.onOpenSettings = { [weak self] tab in self?.settingsWindow.show(tab: tab) }
         if !shortcuts.activate() {
             NSSound.beep()
-            shortcutWindow.show()
+            settingsWindow.show()
         }
-        shortcutWindow.onChange = { [weak self] shortcut in self?.updateTranslateItem(shortcut) }
         serviceProvider.onText = { [weak self] text in
             self?.coordinator.translate(text: text, anchor: nil)
         }
         NSApp.servicesProvider = serviceProvider
         NSUpdateDynamicServices()
         Accessibility.requestTrustIfNeeded()
+    }
+
+    private func setUpMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenu = NSMenu(title: "Quick Translator")
+        let settingsItem = NSMenuItem(title: "Ajustes…", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        appMenu.addItem(settingsItem)
+        appMenu.addItem(.separator())
+        appMenu.addItem(NSMenuItem(title: "Salir de Quick Translator", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        let appItem = NSMenuItem()
+        appItem.submenu = appMenu
+        mainMenu.addItem(appItem)
+
+        let editMenu = NSMenu(title: EditMenu.title)
+        for (index, section) in EditMenu.sections.enumerated() {
+            if index > 0 { editMenu.addItem(.separator()) }
+            for spec in section {
+                let item = NSMenuItem(title: spec.title, action: NSSelectorFromString(spec.action), keyEquivalent: spec.key)
+                item.keyEquivalentModifierMask = spec.modifiers.reduce(into: []) { flags, modifier in
+                    switch modifier {
+                    case .command: flags.insert(.command)
+                    case .shift: flags.insert(.shift)
+                    }
+                }
+                editMenu.addItem(item)
+            }
+        }
+        let editItem = NSMenuItem()
+        editItem.submenu = editMenu
+        mainMenu.addItem(editItem)
+
+        NSApp.mainMenu = mainMenu
     }
 
     private func setUpStatusItem() {
@@ -51,17 +99,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(translateItem)
         self.translateItem = translateItem
         updateTranslateItem(shortcuts.current)
-        let shortcutItem = NSMenuItem(title: "Cambiar atajo…", action: #selector(openShortcutWindow), keyEquivalent: "")
-        shortcutItem.target = self
-        menu.addItem(shortcutItem)
-        menu.addItem(.separator())
-        let automaticClaudeItem = NSMenuItem(title: "Traducir con Claude automáticamente", action: #selector(toggleAutomaticClaude(_:)), keyEquivalent: "")
-        automaticClaudeItem.target = self
-        automaticClaudeItem.state = settings.automaticClaude ? .on : .off
-        menu.addItem(automaticClaudeItem)
-        menu.addItem(.separator())
-        menu.addItem(languageMenuItem(title: "Mi idioma", action: #selector(selectMyLanguage(_:))))
-        menu.addItem(languageMenuItem(title: "Idioma destino", action: #selector(selectTargetLanguage(_:))))
+        let settingsItem = NSMenuItem(title: "Ajustes…", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
         menu.addItem(.separator())
         let accessibilityItem = NSMenuItem(title: "Permiso de Accesibilidad…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
         accessibilityItem.target = self
@@ -70,51 +110,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
-        refreshLanguageMenus()
-    }
-
-    private var languageItems: [NSMenuItem] = []
-
-    private func languageMenuItem(title: String, action: Selector) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        let submenu = NSMenu()
-        let codes = Languages.supportedCodes.sorted { Languages.displayName(forCode: $0) < Languages.displayName(forCode: $1) }
-        for code in codes {
-            let languageItem = NSMenuItem(title: Languages.displayName(forCode: code), action: action, keyEquivalent: "")
-            languageItem.target = self
-            languageItem.representedObject = code
-            submenu.addItem(languageItem)
-        }
-        item.submenu = submenu
-        item.representedObject = title
-        languageItems.append(item)
-        return item
-    }
-
-    private func refreshLanguageMenus() {
-        let pair = settings.languagePair
-        for item in languageItems {
-            let title = item.representedObject as? String ?? ""
-            let selected = title == "Mi idioma" ? pair.mine : pair.target
-            item.title = "\(title): \(Languages.displayName(forCode: selected))"
-            for languageItem in item.submenu?.items ?? [] {
-                languageItem.state = languageItem.representedObject as? String == selected ? .on : .off
-            }
-        }
-    }
-
-    @objc private func selectMyLanguage(_ sender: NSMenuItem) {
-        guard let code = sender.representedObject as? String else { return }
-        settings.languagePair = settings.languagePair.withMine(code)
-        refreshLanguageMenus()
-        coordinator.languagePairDidChange()
-    }
-
-    @objc private func selectTargetLanguage(_ sender: NSMenuItem) {
-        guard let code = sender.representedObject as? String else { return }
-        settings.languagePair = settings.languagePair.withTarget(code)
-        refreshLanguageMenus()
-        coordinator.languagePairDidChange()
     }
 
     private func updateTranslateItem(_ shortcut: Shortcut) {
@@ -138,17 +133,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return flags
     }
 
-    @objc private func openShortcutWindow() {
-        shortcutWindow.show()
+    @objc private func openSettings() {
+        settingsWindow.show()
     }
 
     @objc private func translateFromMenu() {
         coordinator.translateCurrentSelection()
-    }
-
-    @objc private func toggleAutomaticClaude(_ sender: NSMenuItem) {
-        settings.automaticClaude.toggle()
-        sender.state = settings.automaticClaude ? .on : .off
     }
 
     @objc private func openAccessibilitySettings() {

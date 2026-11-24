@@ -4,11 +4,26 @@ public final class AppSettings {
     public static let automaticClaudeKey = "automaticClaudeTranslation"
     public static let shortcutKey = "translateShortcut"
     public static let languagePairKey = "languagePair"
+    public static let providerKey = "translationProvider"
+    public static let claudeAPIModelKey = "claudeAPIModel"
 
     private let defaults: UserDefaults
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+    }
+
+    public var provider: TranslationProviderKind {
+        get { defaults.string(forKey: Self.providerKey).flatMap(TranslationProviderKind.init(rawValue:)) ?? .claudeCode }
+        set { defaults.set(newValue.rawValue, forKey: Self.providerKey) }
+    }
+
+    public var claudeAPIModel: String {
+        get {
+            let stored = defaults.string(forKey: Self.claudeAPIModelKey)
+            return ClaudeModelOption.all.first { $0.id == stored }?.id ?? ClaudeModelOption.default.id
+        }
+        set { defaults.set(newValue, forKey: Self.claudeAPIModelKey) }
     }
 
     public var automaticClaude: Bool {

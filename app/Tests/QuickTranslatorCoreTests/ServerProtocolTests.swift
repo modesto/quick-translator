@@ -94,7 +94,8 @@ struct ServerRequestOverrideTests {
 struct ServerResponseRouterTests {
     @Test("delivers a result with the model to its request")
     func deliversResult() {
-        let router = ServerResponseRouter()
+        let start = Date(timeIntervalSince1970: 0)
+        let router = ServerResponseRouter(now: { start })
         let recorder = Recorder()
         router.register(id: "a", completion: recorder.completion)
 
@@ -102,7 +103,9 @@ struct ServerResponseRouterTests {
 
         #expect(recorder.successes == [ClaudeTranslation(
             result: TranslationResult(sourceLanguage: "Spanish", targetLanguage: "English", variants: [TranslationVariant(label: "Natural", text: "See you later")]),
-            model: "claude-haiku-5-5"
+            model: "claude-haiku-5-5",
+            provider: .claudeCode,
+            elapsed: 0
         )])
         #expect(router.pendingCount == 0)
     }

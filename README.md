@@ -36,13 +36,29 @@ To keep the Accessibility permission across rebuilds, sign with a stable code si
 
 ## Use
 
-- **⌥⌘T** — translate the current selection. Change it from the menu bar icon.
+- **⌥⌘T** — translate the current selection. Change it in Settings.
 - **Right click → Services → Traducir con Quick Translator** — the same from the context menu.
-- **Menu bar icon**:
-  - *Cambiar atajo…* — record a new shortcut, or reset it to ⌥⌘T. It needs ⌘, ⌥ or ⌃, and common ⌘ shortcuts such as ⌘C or ⌘Q are refused. If another app already owns the combination, the previous shortcut is kept.
-  - *Mi idioma* and *Idioma destino* — your language and the language text in it is translated into. Picking the other side's language swaps them. If Apple Translation is missing a language of the new pair, an alert offers to open Language & Region, where *Translation Languages…* downloads it; if Apple does not support the pair at all, only Claude translates it.
-  - *Traducir con Claude automáticamente* — when on, Claude's variants are requested with every translation. When off, the popup shows a **Traducir con Claude (C)** button and Claude is only called when you press it or the **C** key.
-  - *Permiso de Accesibilidad…* — opens the Accessibility settings.
+- **Menu bar icon** — *Traducir selección*, *Ajustes…* (⌘,), *Permiso de Accesibilidad…* and *Salir*.
+
+## Settings
+
+**General**
+
+- *Atajo de teclado* — record a new shortcut, or reset it to ⌥⌘T. It needs ⌘, ⌥ or ⌃, and common ⌘ shortcuts such as ⌘C or ⌘Q are refused. If another app already owns the combination, the previous shortcut is kept.
+- *Mi idioma* and *Idioma destino* — your language and the language text in it is translated into. Picking the other side's language swaps them. If Apple Translation is missing a language of the new pair, an alert offers to open Language & Region, where *Translation Languages…* downloads it; if Apple does not support the pair at all, only the second provider translates it.
+
+**Proveedor** — the provider of the second popup section, next to Apple Translation:
+
+| Provider | Versions | Needs |
+|---|---|---|
+| Claude Code | Several registers (natural, formal, informal…) | Your Claude Code login |
+| Claude API | Several registers, with Haiku 5.5, Sonnet 5.5 or Opus 5.5 | An API key from platform.claude.com, billed separately |
+| DeepL | Formal and informal when the target language supports it, otherwise one | A DeepL API key; free keys end in `:fx` |
+
+- Keys are stored in the macOS Keychain, never in files or preferences.
+- *Traducir automáticamente* — when on, the provider is asked with every translation. When off, the popup shows a **Traducir con … (C)** button.
+- *Probar* — runs a test translation with the selected provider and shows the time it took or the error.
+- The popup shows how long each provider took, so you can compare them.
 
 ## CLI
 
@@ -55,7 +71,7 @@ node dist/cli.js "Nos vemos mañana a primera hora"
 echo "See you tomorrow" | node dist/cli.js --to French --count 3
 ```
 
-Options: `--mine <language>` (default Spanish) and `--target <language>` (default English) for the language pair, `--to <language>` to force one target, `--count <1-8>`, `--model <id>` (default `claude-haiku-5-5`), `--effort low|medium|high`, `--server`.
+Options: `--provider claude-code|claude-api|deepl` (keys in `QT_ANTHROPIC_API_KEY` and `QT_DEEPL_AUTH_KEY`), `--api-model <id>` for the Claude API, `--mine <language>` (default Spanish) and `--target <language>` (default English) for the language pair, `--to <language>` to force one target, `--count <1-8>`, `--model <id>` (default `claude-haiku-5-5`), `--effort low|medium|high`, `--server`.
 
 With `--server` it stays running, keeps Claude Code warm and answers one JSON request per line:
 

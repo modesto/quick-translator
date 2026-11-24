@@ -2,6 +2,8 @@ import Foundation
 import QuickTranslatorCore
 
 final class Translator {
+    private let settings: AppSettings
+    private let secrets: SecretStore
     private var process: Process?
     private var input: FileHandle?
     private let router = ServerResponseRouter()
@@ -9,22 +11,34 @@ final class Translator {
     private var nodePath: String? { Bundle.main.object(forInfoDictionaryKey: "QTNodePath") as? String }
     private var cliPath: String? { Bundle.main.object(forInfoDictionaryKey: "QTCLIPath") as? String }
 
+    init(settings: AppSettings, secrets: SecretStore) {
+        self.settings = settings
+        self.secrets = secrets
+    }
+
     func start() {
         guard process == nil else { return }
         try? launchServer()
+    }
+
+    func restart() {
+        stop()
+        start()
     }
 
     func translate(
         _ text: String,
         languagePair: LanguagePair,
         targetOverride: String? = nil,
+        provider: TranslationProviderKind? = nil,
         completion: @escaping ServerResponseRouter.Completion
     ) {
         let id = UUID().uuidString
         router.register(id: id, completion: completion)
         do {
             if process == nil { try launchServer() }
-            try input?.write(contentsOf: ServerRequest(id: id, text: text, languagePair: languagePair, targetOverride: targetOverride).encodedLine())
+            let request = ServerRequest(id: id, text: text, languagePair: languagePair, targetOverride: targetOverride, provider: provider)
+            try input?.write(contentsOf: request.encodedLine())
         } catch {
             router.fail(id: id, with: error)
         }
@@ -32,6 +46,15 @@ final class Translator {
 
     func cancel() {
         router.cancelCurrent()
+    }
+
+    private func stop() {
+        guard let process else { return }
+        self.process = nil
+        input = nil
+        process.terminationHandler = nil
+        process.terminate()
+        router.failAll(with: TranslatorError.serverStopped)
     }
 
     private func launchServer() throws {
@@ -43,7 +66,8 @@ final class Translator {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: nodePath)
-        process.arguments = [cliPath, "--server"]
+        process.arguments = ServerLaunch.arguments(cliPath: cliPath, provider: settings.provider, apiModel: settings.claudeAPIModel)
+        process.environment = ServerLaunch.environment(base: ProcessInfo.processInfo.environment, secrets: secrets)
         let inputPipe = Pipe()
         let outputPipe = Pipe()
         process.standardInput = inputPipe

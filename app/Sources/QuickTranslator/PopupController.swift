@@ -6,11 +6,15 @@ final class PopupModel: ObservableObject {
     @Published var original = ""
     @Published var apple: ProviderState<AppleTranslation> = .loading
     @Published var claude: ProviderState<ClaudeTranslation> = .loading
+    @Published var provider: TranslationProviderKind = .claudeCode
+    @Published var appleElapsed: TimeInterval?
+    @Published var claudeOffersSettings = false
     @Published var appleOffersDownload = false
     @Published var targetOverride: String?
     var onChoose: (String) -> Void = { _ in }
     var onClose: () -> Void = {}
     var onRequestClaude: () -> Void = {}
+    var onOpenProviderSettings: () -> Void = {}
     var onOpenLanguageSettings: () -> Void = {}
     var onSelectTarget: (String?) -> Void = { _ in }
 
@@ -29,6 +33,7 @@ final class PopupController {
     var onClose: () -> Void = {}
     var onRequestClaude: () -> Void = {}
     var onSelectTarget: (String?) -> Void = { _ in }
+    var onOpenProviderSettings: () -> Void = {}
 
     var hasRequestedClaude: Bool {
         if case .idle = model.claude { return false }
@@ -47,14 +52,21 @@ final class PopupController {
         model.onClose = { [weak self] in self?.close() }
         model.onRequestClaude = { [weak self] in self?.onRequestClaude() }
         model.onSelectTarget = { [weak self] code in self?.onSelectTarget(code) }
+        model.onOpenProviderSettings = { [weak self] in
+            self?.close()
+            self?.onOpenProviderSettings()
+        }
         model.onOpenLanguageSettings = { [weak self] in
             self?.close()
             NSWorkspace.shared.open(LanguagePackAdvice.settingsURL)
         }
     }
 
-    func showLoading(original: String, anchor: NSRect?) {
+    func showLoading(original: String, anchor: NSRect?, provider: TranslationProviderKind) {
         model.original = original
+        model.provider = provider
+        model.appleElapsed = nil
+        model.claudeOffersSettings = false
         model.apple = .loading
         model.appleOffersDownload = false
         model.targetOverride = nil
@@ -62,8 +74,9 @@ final class PopupController {
         present(anchor: anchor)
     }
 
-    func showApple(_ state: ProviderState<AppleTranslation>, offersDownload: Bool = false) {
+    func showApple(_ state: ProviderState<AppleTranslation>, offersDownload: Bool = false, elapsed: TimeInterval? = nil) {
         model.apple = state
+        model.appleElapsed = elapsed
         model.appleOffersDownload = offersDownload
         resizeToFit()
     }
@@ -73,8 +86,9 @@ final class PopupController {
         resizeToFit()
     }
 
-    func showClaude(_ state: ProviderState<ClaudeTranslation>) {
+    func showClaude(_ state: ProviderState<ClaudeTranslation>, offersSettings: Bool = false) {
         model.claude = state
+        model.claudeOffersSettings = offersSettings
         resizeToFit()
     }
 
@@ -175,11 +189,11 @@ private struct PopupView: View {
         VStack(alignment: .leading, spacing: 10) {
             header
             Divider()
-            ProviderSection(icon: "apple.logo", title: "Apple Translation", subtitle: appleSubtitle) {
+            ProviderSection(icon: "apple.logo", title: "Apple Translation", subtitle: appleSubtitle, elapsed: model.appleElapsed) {
                 appleContent
             }
             Divider()
-            ProviderSection(icon: "sparkles", title: claudeTitle, subtitle: claudeSubtitle) {
+            ProviderSection(icon: model.provider.symbolName, title: claudeTitle, subtitle: claudeSubtitle, elapsed: claudeElapsed) {
                 claudeContent
             }
         }
@@ -213,17 +227,22 @@ private struct PopupView: View {
     }
 
     private var claudeTitle: String {
-        if case .done(let translation) = model.claude, let modelID = translation.model {
-            return ModelName.displayName(forModel: modelID)
+        if case .done(let translation) = model.claude, translation.provider.showsModelName, let modelID = translation.model {
+            return "\(translation.provider.displayName) · \(ModelName.displayName(forModel: modelID))"
         }
-        return "Claude"
+        return model.provider.displayName
     }
 
     private var claudeSubtitle: String {
         if case .done(let translation) = model.claude {
-            return "Claude Code · \(translation.result.sourceLanguage) → \(translation.result.targetLanguage)"
+            return "\(translation.result.sourceLanguage) → \(translation.result.targetLanguage)"
         }
-        return "Claude Code"
+        return ""
+    }
+
+    private var claudeElapsed: TimeInterval? {
+        if case .done(let translation) = model.claude { return translation.elapsed }
+        return nil
     }
 
     @ViewBuilder
@@ -251,13 +270,21 @@ private struct PopupView: View {
     private var claudeContent: some View {
         switch model.claude {
         case .idle:
-            ClaudeRequestButton(action: model.onRequestClaude)
+            ClaudeRequestButton(title: "Traducir con \(model.provider.displayName)", action: model.onRequestClaude)
         case .loading:
             LoadingRow()
         case .failed(let message):
             VStack(alignment: .leading, spacing: 8) {
                 FailureRow(message: message)
-                ClaudeRequestButton(title: "Reintentar con Claude", action: model.onRequestClaude)
+                HStack {
+                    if model.claudeOffersSettings {
+                        Button(action: model.onOpenProviderSettings) {
+                            Label("Ajustes…", systemImage: "gearshape")
+                        }
+                        .controlSize(.small)
+                    }
+                    ClaudeRequestButton(title: "Reintentar", action: model.onRequestClaude)
+                }
             }
         case .done(let translation):
             VStack(alignment: .leading, spacing: 8) {
@@ -276,6 +303,7 @@ private struct ProviderSection<Content: View>: View {
     let icon: String
     let title: String
     let subtitle: String
+    var elapsed: TimeInterval?
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -289,6 +317,13 @@ private struct ProviderSection<Content: View>: View {
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.tertiary)
+                Spacer(minLength: 4)
+                if let elapsed {
+                    Text(Elapsed.format(elapsed))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .help("Tiempo de respuesta")
+                }
             }
             content
         }
@@ -332,7 +367,7 @@ private struct TargetLanguageMenu: View {
 }
 
 private struct ClaudeRequestButton: View {
-    var title = "Traducir con Claude"
+    let title: String
     let action: () -> Void
 
     var body: some View {
@@ -340,7 +375,7 @@ private struct ClaudeRequestButton: View {
             Label("\(title)  (C)", systemImage: "sparkles")
         }
         .controlSize(.small)
-        .help("Pedir varias versiones a Claude (tecla C)")
+        .help("Pedir las versiones (tecla C)")
     }
 }
 
