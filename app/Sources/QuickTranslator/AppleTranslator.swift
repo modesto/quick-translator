@@ -14,12 +14,17 @@ final class AppleTranslator {
         }
     }
 
-    func translate(_ text: String, languagePair: LanguagePair, completion: @escaping (Result<AppleTranslation, Error>) -> Void) {
+    func translate(
+        _ text: String,
+        languagePair: LanguagePair,
+        targetOverride: String? = nil,
+        completion: @escaping (Result<AppleTranslation, Error>) -> Void
+    ) {
         cancel()
         currentTask = Task {
             let result: Result<AppleTranslation, Error>
             do {
-                result = .success(try await translate(text, languagePair: languagePair))
+                result = .success(try await translate(text, languagePair: languagePair, targetOverride: targetOverride))
             } catch {
                 result = .failure(error)
             }
@@ -53,9 +58,11 @@ final class AppleTranslator {
         }
     }
 
-    private func translate(_ text: String, languagePair: LanguagePair) async throws -> AppleTranslation {
+    private func translate(_ text: String, languagePair: LanguagePair, targetOverride: String?) async throws -> AppleTranslation {
         guard let source = Languages.dominantLanguageCode(of: text) else { throw AppleTranslatorError.unknownLanguage }
-        let target = languagePair.targetCode(forSource: source)
+        guard let target = languagePair.targetCode(forSource: source, override: targetOverride) else {
+            throw AppleTranslatorError.alreadyInTarget(source)
+        }
         let status = await LanguageAvailability().status(from: Locale.Language(identifier: source), to: Locale.Language(identifier: target))
         guard status == .installed else {
             throw AppleTranslatorError.notInstalled(source: source, target: target)

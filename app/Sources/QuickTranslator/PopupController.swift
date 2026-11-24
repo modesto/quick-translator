@@ -7,10 +7,12 @@ final class PopupModel: ObservableObject {
     @Published var apple: ProviderState<AppleTranslation> = .loading
     @Published var claude: ProviderState<ClaudeTranslation> = .loading
     @Published var appleOffersDownload = false
+    @Published var targetOverride: String?
     var onChoose: (String) -> Void = { _ in }
     var onClose: () -> Void = {}
     var onRequestClaude: () -> Void = {}
     var onOpenLanguageSettings: () -> Void = {}
+    var onSelectTarget: (String?) -> Void = { _ in }
 
     func text(forKey key: Int) -> String? {
         ChoiceKeys.text(forKey: key, apple: apple, claude: claude)
@@ -26,6 +28,12 @@ final class PopupController {
     var onChoose: (String) -> Void = { _ in }
     var onClose: () -> Void = {}
     var onRequestClaude: () -> Void = {}
+    var onSelectTarget: (String?) -> Void = { _ in }
+
+    var hasRequestedClaude: Bool {
+        if case .idle = model.claude { return false }
+        return true
+    }
 
     private static let width: CGFloat = 440
     private let model = PopupModel()
@@ -38,6 +46,7 @@ final class PopupController {
         model.onChoose = { [weak self] text in self?.onChoose(text) }
         model.onClose = { [weak self] in self?.close() }
         model.onRequestClaude = { [weak self] in self?.onRequestClaude() }
+        model.onSelectTarget = { [weak self] code in self?.onSelectTarget(code) }
         model.onOpenLanguageSettings = { [weak self] in
             self?.close()
             NSWorkspace.shared.open(LanguagePackAdvice.settingsURL)
@@ -48,6 +57,7 @@ final class PopupController {
         model.original = original
         model.apple = .loading
         model.appleOffersDownload = false
+        model.targetOverride = nil
         model.claude = .idle
         present(anchor: anchor)
     }
@@ -55,6 +65,11 @@ final class PopupController {
     func showApple(_ state: ProviderState<AppleTranslation>, offersDownload: Bool = false) {
         model.apple = state
         model.appleOffersDownload = offersDownload
+        resizeToFit()
+    }
+
+    func showTargetOverride(_ code: String?) {
+        model.targetOverride = code
         resizeToFit()
     }
 
@@ -181,6 +196,7 @@ private struct PopupView: View {
                 .lineLimit(2)
                 .truncationMode(.tail)
             Spacer(minLength: 8)
+            TargetLanguageMenu(selected: model.targetOverride, select: model.onSelectTarget)
             Button(action: model.onClose) {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
             }
@@ -276,6 +292,42 @@ private struct ProviderSection<Content: View>: View {
             }
             content
         }
+    }
+}
+
+private struct TargetLanguageMenu: View {
+    let selected: String?
+    let select: (String?) -> Void
+
+    private static let codes = Languages.supportedCodes.sorted {
+        Languages.displayName(forCode: $0) < Languages.displayName(forCode: $1)
+    }
+
+    var body: some View {
+        Menu {
+            Button("Idiomas configurados") { select(nil) }
+                .disabled(selected == nil)
+            Divider()
+            ForEach(Self.codes, id: \.self) { code in
+                Toggle(Languages.displayName(forCode: code), isOn: Binding(
+                    get: { selected == code },
+                    set: { _ in select(code) }
+                ))
+            }
+        } label: {
+            HStack(spacing: 2) {
+                Image(systemName: "globe")
+                if let selected {
+                    Text(selected.uppercased()).font(.caption2.weight(.semibold))
+                }
+            }
+            .foregroundStyle(selected == nil ? .tertiary : .secondary)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(selected.map { "Traduciendo a \(Languages.displayName(forCode: $0)) solo esta vez" } ?? "Traducir a otro idioma solo esta vez")
     }
 }
 

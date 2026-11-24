@@ -54,6 +54,26 @@ struct LanguagePairTests {
         #expect(LanguagePair(mine: "es", target: "fr").targetCode(forSource: source) == target)
     }
 
+    @Test("a one-off target replaces the pair rule", arguments: [
+        ("es", "fr", "fr"),
+        ("en", "fr", "fr"),
+        ("de", "ja", "ja"),
+    ])
+    func overrideTarget(source: String, override: String, target: String) {
+        #expect(LanguagePair.default.targetCode(forSource: source, override: override) == target)
+    }
+
+    @Test("a one-off target equal to the text's language has nothing to translate")
+    func overrideSameLanguage() {
+        #expect(LanguagePair.default.targetCode(forSource: "fr", override: "fr") == nil)
+    }
+
+    @Test("without a one-off target the pair rule applies")
+    func noOverride() {
+        #expect(LanguagePair.default.targetCode(forSource: "es", override: nil) == "en")
+        #expect(LanguagePair.default.targetCode(forSource: "fr", override: nil) == "es")
+    }
+
     @Test("changing one side keeps the other")
     func changeOneSide() {
         let pair = LanguagePair(mine: "es", target: "en")

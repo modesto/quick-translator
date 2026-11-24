@@ -72,6 +72,24 @@ struct ServerRequestTests {
     }
 }
 
+@Suite("ServerRequest one-off target")
+struct ServerRequestOverrideTests {
+    @Test("sends a one-off target as 'to' by English name")
+    func sendsTo() throws {
+        let line = try ServerRequest(id: "1", text: "hola", languagePair: .default, targetOverride: "ja").encodedLine()
+        let decoded = try JSONSerialization.jsonObject(with: line.dropLast()) as? [String: String]
+        #expect(decoded?["to"] == "Japanese")
+        #expect(decoded?["mine"] == "Spanish")
+    }
+
+    @Test("omits 'to' when there is no one-off target")
+    func omitsTo() throws {
+        let line = try ServerRequest(id: "1", text: "hola", languagePair: .default).encodedLine()
+        let decoded = try JSONSerialization.jsonObject(with: line.dropLast()) as? [String: String]
+        #expect(decoded?["to"] == nil)
+    }
+}
+
 @Suite("ServerResponseRouter")
 struct ServerResponseRouterTests {
     @Test("delivers a result with the model to its request")

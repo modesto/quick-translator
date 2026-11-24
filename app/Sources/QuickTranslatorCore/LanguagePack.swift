@@ -49,12 +49,15 @@ public enum LanguagePackAdvice: Equatable, Sendable {
 
 public enum AppleTranslatorError: LocalizedError, Equatable {
     case unknownLanguage
+    case alreadyInTarget(String)
     case notInstalled(source: String, target: String)
 
     public var errorDescription: String? {
         switch self {
         case .unknownLanguage:
             return "No se ha podido detectar el idioma."
+        case .alreadyInTarget(let code):
+            return "El texto ya está en \(Languages.displayName(forCode: code))."
         case .notInstalled(let source, let target):
             let sourceName = Languages.displayName(forCode: source)
             let targetName = Languages.displayName(forCode: target)

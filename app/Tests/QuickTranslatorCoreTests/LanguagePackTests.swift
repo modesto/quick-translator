@@ -57,6 +57,13 @@ struct AppleTranslatorErrorTests {
         #expect(error.errorDescription == "Falta descargar Español → Hindi para traducir en el Mac.")
     }
 
+    @Test("text already in the one-off target says so and offers no download")
+    func alreadyInTarget() {
+        let error = AppleTranslatorError.alreadyInTarget("fr")
+        #expect(error.errorDescription == "El texto ya está en Francés.")
+        #expect(error.offersLanguageDownload == false)
+    }
+
     @Test("other failures do not offer the download")
     func otherErrors() {
         #expect(AppleTranslatorError.unknownLanguage.offersLanguageDownload == false)

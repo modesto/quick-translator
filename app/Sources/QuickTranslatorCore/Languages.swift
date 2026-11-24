@@ -40,6 +40,11 @@ public struct LanguagePair: Codable, Equatable, Sendable {
         source == mine ? target : mine
     }
 
+    public func targetCode(forSource source: String, override: String?) -> String? {
+        guard let override else { return targetCode(forSource: source) }
+        return override == source ? nil : override
+    }
+
     public func withMine(_ code: String) -> LanguagePair {
         code == target ? LanguagePair(mine: code, target: mine) : LanguagePair(mine: code, target: target)
     }

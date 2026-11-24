@@ -9,11 +9,13 @@ final class TranslationCoordinator {
     private let settings: AppSettings
     private var targetApplication: NSRunningApplication?
     private var currentText = ""
+    private var targetOverride: String?
 
     init(settings: AppSettings) {
         self.settings = settings
         popup.onChoose = { [weak self] text in self?.apply(text) }
         popup.onRequestClaude = { [weak self] in self?.requestClaude() }
+        popup.onSelectTarget = { [weak self] code in self?.retranslate(to: code) }
         popup.onClose = { [weak self] in
             self?.translator.cancel()
             self?.appleTranslator.cancel()
@@ -47,8 +49,23 @@ final class TranslationCoordinator {
     private func start(text: String, anchor: NSRect?) {
         translator.cancel()
         currentText = text
+        targetOverride = nil
         popup.showLoading(original: text, anchor: anchor)
-        appleTranslator.translate(text, languagePair: settings.languagePair) { [weak self] result in
+        translateWithApple()
+        if settings.automaticClaude { requestClaude() }
+    }
+
+    private func retranslate(to code: String?) {
+        guard code != targetOverride else { return }
+        targetOverride = code
+        popup.showTargetOverride(code)
+        translateWithApple()
+        if popup.hasRequestedClaude { requestClaude() }
+    }
+
+    private func translateWithApple() {
+        popup.showApple(.loading)
+        appleTranslator.translate(currentText, languagePair: settings.languagePair, targetOverride: targetOverride) { [weak self] result in
             switch result {
             case .success(let translation): self?.popup.showApple(.done(translation))
             case .failure(let error):
@@ -58,12 +75,11 @@ final class TranslationCoordinator {
                 )
             }
         }
-        if settings.automaticClaude { requestClaude() }
     }
 
     private func requestClaude() {
         popup.showClaude(.loading)
-        translator.translate(currentText, languagePair: settings.languagePair) { [weak self] result in
+        translator.translate(currentText, languagePair: settings.languagePair, targetOverride: targetOverride) { [weak self] result in
             switch result {
             case .success(let response): self?.popup.showClaude(.done(response))
             case .failure(let error): self?.popup.showClaude(.failed(error.localizedDescription))

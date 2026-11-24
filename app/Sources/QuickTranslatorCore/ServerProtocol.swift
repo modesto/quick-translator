@@ -5,12 +5,14 @@ public struct ServerRequest: Encodable, Equatable {
     public let text: String
     public let mine: String
     public let target: String
+    public let to: String?
 
-    public init(id: String, text: String, languagePair: LanguagePair) {
+    public init(id: String, text: String, languagePair: LanguagePair, targetOverride: String? = nil) {
         self.id = id
         self.text = text
         mine = Languages.englishName(forCode: languagePair.mine)
         target = Languages.englishName(forCode: languagePair.target)
+        to = targetOverride.map(Languages.englishName(forCode:))
     }
 
     public func encodedLine() throws -> Data {

@@ -9,6 +9,8 @@ Select some text, press **⌥⌘T** (or the shortcut you set) and a popup shows:
 
 Click **Usar N** or press the number key to replace the selection. Press **Esc** or click outside to close.
 
+To translate into another language just this once, click the globe icon at the top of the popup and pick a language. Both providers translate again into it; nothing is saved, so the next translation uses your configured languages.
+
 Text in your language goes to your target language, and text in any other language goes to yours. By default your language is Spanish and the target is English; change both from the menu bar icon.
 
 ## Requirements
