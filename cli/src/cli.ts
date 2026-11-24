@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { parseArgs } from "node:util";
+import { parseOptions } from "./options.js";
 import { runServer } from "./server.js";
-import { translate, type TranslateOptions } from "./translate.js";
+import { translate } from "./translate.js";
 
 const USAGE = `Usage: quick-translate [options] [text]
        quick-translate --server [options]
@@ -29,44 +29,8 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function parseOptions(): { text: string | undefined; options: TranslateOptions; help: boolean; server: boolean } {
-  const { values, positionals } = parseArgs({
-    allowPositionals: true,
-    options: {
-      to: { type: "string", short: "t" },
-      count: { type: "string", short: "n" },
-      model: { type: "string", short: "m" },
-      effort: { type: "string", short: "e" },
-      help: { type: "boolean", short: "h" },
-      server: { type: "boolean", short: "s" },
-    },
-  });
-
-  const effort = values.effort ?? "low";
-  if (!["low", "medium", "high"].includes(effort)) {
-    throw new Error(`Invalid effort: ${effort}`);
-  }
-
-  const count = values.count ? Number.parseInt(values.count, 10) : 4;
-  if (!Number.isInteger(count) || count < 1 || count > 8) {
-    throw new Error("--count must be an integer between 1 and 8");
-  }
-
-  return {
-    text: positionals.length > 0 ? positionals.join(" ") : undefined,
-    help: values.help ?? false,
-    server: values.server ?? false,
-    options: {
-      targetLanguage: values.to,
-      count,
-      model: values.model ?? "claude-haiku-5-5",
-      effort: effort as TranslateOptions["effort"],
-    },
-  };
-}
-
 async function main(): Promise<void> {
-  const { text: argText, options, help, server } = parseOptions();
+  const { text: argText, options, help, server } = parseOptions(process.argv.slice(2));
   if (help) {
     console.log(USAGE);
     return;

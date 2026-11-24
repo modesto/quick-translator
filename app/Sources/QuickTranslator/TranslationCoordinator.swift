@@ -1,4 +1,5 @@
 import AppKit
+import QuickTranslatorCore
 
 @MainActor
 final class TranslationCoordinator {

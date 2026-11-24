@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import QuickTranslatorCore
 
 struct Selection {
     let text: String
@@ -40,12 +41,7 @@ enum SelectionReader {
               let boundsValue, CFGetTypeID(boundsValue) == AXValueGetTypeID() else { return nil }
         var rect = CGRect.zero
         guard AXValueGetValue(boundsValue as! AXValue, .cgRect, &rect), rect.width > 0 || rect.height > 0 else { return nil }
-        return cocoaRect(fromAccessibility: rect)
-    }
-
-    private static func cocoaRect(fromAccessibility rect: CGRect) -> NSRect {
-        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-        return NSRect(x: rect.minX, y: primaryHeight - rect.maxY, width: rect.width, height: rect.height)
+        return PopupPlacement.cocoaRect(fromAccessibility: rect, primaryScreenHeight: NSScreen.screens.first?.frame.height ?? 0)
     }
 
     private static func readViaCopy(completion: @escaping (Selection?) -> Void) {

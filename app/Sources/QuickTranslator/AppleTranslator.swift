@@ -1,12 +1,6 @@
 import Foundation
-import NaturalLanguage
+import QuickTranslatorCore
 import Translation
-
-struct AppleTranslation {
-    let text: String
-    let sourceLanguage: String
-    let targetLanguage: String
-}
 
 enum AppleTranslatorError: LocalizedError {
     case unknownLanguage
@@ -54,14 +48,18 @@ final class AppleTranslator {
     }
 
     private func translate(_ text: String) async throws -> AppleTranslation {
-        guard let source = Self.detectLanguage(of: text) else { throw AppleTranslatorError.unknownLanguage }
-        let target = source == "es" ? "en" : "es"
+        guard let source = Languages.dominantLanguageCode(of: text) else { throw AppleTranslatorError.unknownLanguage }
+        let target = Languages.targetLanguageCode(forSource: source)
         let status = await LanguageAvailability().status(from: Locale.Language(identifier: source), to: Locale.Language(identifier: target))
         guard status == .installed else {
-            throw AppleTranslatorError.notInstalled(Self.displayName(source), Self.displayName(target))
+            throw AppleTranslatorError.notInstalled(Languages.displayName(forCode: source), Languages.displayName(forCode: target))
         }
         let response = try await session(from: source, to: target).translate(text)
-        return AppleTranslation(text: response.targetText, sourceLanguage: Self.displayName(source), targetLanguage: Self.displayName(target))
+        return AppleTranslation(
+            text: response.targetText,
+            sourceLanguage: Languages.displayName(forCode: source),
+            targetLanguage: Languages.displayName(forCode: target)
+        )
     }
 
     private func session(from source: String, to target: String) -> TranslationSession {
@@ -70,15 +68,5 @@ final class AppleTranslator {
         let session = TranslationSession(installedSource: Locale.Language(identifier: source), target: Locale.Language(identifier: target))
         sessions[key] = session
         return session
-    }
-
-    private static func detectLanguage(of text: String) -> String? {
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(text)
-        return recognizer.dominantLanguage.map { Locale.Language(identifier: $0.rawValue).languageCode?.identifier ?? $0.rawValue }
-    }
-
-    private static func displayName(_ code: String) -> String {
-        Locale(identifier: "es").localizedString(forLanguageCode: code)?.capitalized ?? code
     }
 }

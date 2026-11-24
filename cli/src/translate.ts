@@ -81,7 +81,7 @@ ${text}
 </text>`;
 }
 
-function isTranslationResult(value: unknown): value is TranslationResult {
+export function isTranslationResult(value: unknown): value is TranslationResult {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Record<string, unknown>;
   return (

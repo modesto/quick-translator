@@ -1,12 +1,6 @@
 import AppKit
+import QuickTranslatorCore
 import SwiftUI
-
-enum ProviderState<Value> {
-    case idle
-    case loading
-    case done(Value)
-    case failed(String)
-}
 
 final class PopupModel: ObservableObject {
     @Published var original = ""
@@ -16,16 +10,8 @@ final class PopupModel: ObservableObject {
     var onClose: () -> Void = {}
     var onRequestClaude: () -> Void = {}
 
-    static let appleKey = 1
-    static let firstClaudeKey = 2
-
     func text(forKey key: Int) -> String? {
-        if key == Self.appleKey, case .done(let translation) = apple { return translation.text }
-        if case .done(let translation) = claude {
-            let index = key - Self.firstClaudeKey
-            if translation.result.variants.indices.contains(index) { return translation.result.variants[index].text }
-        }
-        return nil
+        ChoiceKeys.text(forKey: key, apple: apple, claude: claude)
     }
 }
 
@@ -112,25 +98,13 @@ final class PopupController {
     }
 
     private func origin(for size: NSSize) -> NSPoint {
-        let margin: CGFloat = 8
-        let gap: CGFloat = 6
-        let center = NSPoint(x: anchor.midX, y: anchor.midY)
-        let screen = NSScreen.screens.first { $0.frame.contains(center) } ?? NSScreen.main
-        let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-
-        let spaceBelow = anchor.minY - visible.minY - margin - gap
-        let spaceAbove = visible.maxY - anchor.maxY - margin - gap
-        let y: CGFloat
-        if size.height <= spaceBelow {
-            y = anchor.minY - gap - size.height
-        } else if size.height <= spaceAbove {
-            y = anchor.maxY + gap
-        } else {
-            y = visible.maxY - margin - size.height
-        }
-
-        let x = min(max(anchor.minX, visible.minX + margin), visible.maxX - margin - size.width)
-        return NSPoint(x: x, y: max(y, visible.minY + margin))
+        let area = { (screen: NSScreen) in ScreenArea(frame: screen.frame, visibleFrame: screen.visibleFrame) }
+        return PopupPlacement.origin(
+            for: size,
+            anchor: anchor,
+            screens: NSScreen.screens.map(area),
+            mainScreen: NSScreen.main.map(area)
+        )
     }
 
     private func installMonitors() {
@@ -216,7 +190,7 @@ private struct PopupView: View {
 
     private var claudeTitle: String {
         if case .done(let translation) = model.claude, let modelID = translation.model {
-            return Self.displayName(forModel: modelID)
+            return ModelName.displayName(forModel: modelID)
         }
         return "Claude"
     }
@@ -236,7 +210,7 @@ private struct PopupView: View {
         case .failed(let message):
             FailureRow(message: message)
         case .done(let translation):
-            VariantRow(key: PopupModel.appleKey, label: nil, text: translation.text) { model.onChoose(translation.text) }
+            VariantRow(key: ChoiceKeys.apple, label: nil, text: translation.text) { model.onChoose(translation.text) }
         }
     }
 
@@ -255,7 +229,7 @@ private struct PopupView: View {
         case .done(let translation):
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(translation.result.variants.enumerated()), id: \.element.id) { index, variant in
-                    VariantRow(key: PopupModel.firstClaudeKey + index, label: variant.label, text: variant.text) {
+                    VariantRow(key: ChoiceKeys.firstClaude + index, label: variant.label, text: variant.text) {
                         model.onChoose(variant.text)
                     }
                 }
@@ -263,13 +237,6 @@ private struct PopupView: View {
         }
     }
 
-    private static func displayName(forModel id: String) -> String {
-        let parts = id.split(separator: "-").map(String.init)
-        guard parts.count >= 2, parts[0] == "claude" else { return id }
-        let family = parts[1].capitalized
-        let version = parts.dropFirst(2).joined(separator: ".")
-        return version.isEmpty ? "Claude \(family)" : "Claude \(family) \(version)"
-    }
 }
 
 private struct ProviderSection<Content: View>: View {
