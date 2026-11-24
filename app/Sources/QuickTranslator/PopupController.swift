@@ -6,9 +6,11 @@ final class PopupModel: ObservableObject {
     @Published var original = ""
     @Published var apple: ProviderState<AppleTranslation> = .loading
     @Published var claude: ProviderState<ClaudeTranslation> = .loading
+    @Published var appleOffersDownload = false
     var onChoose: (String) -> Void = { _ in }
     var onClose: () -> Void = {}
     var onRequestClaude: () -> Void = {}
+    var onOpenLanguageSettings: () -> Void = {}
 
     func text(forKey key: Int) -> String? {
         ChoiceKeys.text(forKey: key, apple: apple, claude: claude)
@@ -36,17 +38,23 @@ final class PopupController {
         model.onChoose = { [weak self] text in self?.onChoose(text) }
         model.onClose = { [weak self] in self?.close() }
         model.onRequestClaude = { [weak self] in self?.onRequestClaude() }
+        model.onOpenLanguageSettings = { [weak self] in
+            self?.close()
+            NSWorkspace.shared.open(LanguagePackAdvice.settingsURL)
+        }
     }
 
     func showLoading(original: String, anchor: NSRect?) {
         model.original = original
         model.apple = .loading
+        model.appleOffersDownload = false
         model.claude = .idle
         present(anchor: anchor)
     }
 
-    func showApple(_ state: ProviderState<AppleTranslation>) {
+    func showApple(_ state: ProviderState<AppleTranslation>, offersDownload: Bool = false) {
         model.apple = state
+        model.appleOffersDownload = offersDownload
         resizeToFit()
     }
 
@@ -208,7 +216,16 @@ private struct PopupView: View {
         case .idle, .loading:
             LoadingRow()
         case .failed(let message):
-            FailureRow(message: message)
+            VStack(alignment: .leading, spacing: 8) {
+                FailureRow(message: message)
+                if model.appleOffersDownload {
+                    Button(action: model.onOpenLanguageSettings) {
+                        Label("Descargar idioma…", systemImage: "arrow.down.circle")
+                    }
+                    .controlSize(.small)
+                    .help("Abre Idioma y región; pulsa \"Idiomas de traducción…\" para descargarlo")
+                }
+            }
         case .done(let translation):
             VariantRow(key: ChoiceKeys.apple, label: nil, text: translation.text) { model.onChoose(translation.text) }
         }

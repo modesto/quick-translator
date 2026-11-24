@@ -51,7 +51,11 @@ final class TranslationCoordinator {
         appleTranslator.translate(text, languagePair: settings.languagePair) { [weak self] result in
             switch result {
             case .success(let translation): self?.popup.showApple(.done(translation))
-            case .failure(let error): self?.popup.showApple(.failed(error.localizedDescription))
+            case .failure(let error):
+                self?.popup.showApple(
+                    .failed(error.localizedDescription),
+                    offersDownload: AppleTranslatorError.offersLanguageDownload(error)
+                )
             }
         }
         if settings.automaticClaude { requestClaude() }

@@ -2,20 +2,6 @@ import Foundation
 import QuickTranslatorCore
 import Translation
 
-enum AppleTranslatorError: LocalizedError {
-    case unknownLanguage
-    case notInstalled(String, String)
-
-    var errorDescription: String? {
-        switch self {
-        case .unknownLanguage:
-            return "No se ha podido detectar el idioma."
-        case .notInstalled(let source, let target):
-            return "Idiomas \(source) → \(target) no descargados (Ajustes > General > Idioma y región > Idiomas de traducción)."
-        }
-    }
-}
-
 @MainActor
 final class AppleTranslator {
     private var sessions: [String: TranslationSession] = [:]
@@ -72,7 +58,7 @@ final class AppleTranslator {
         let target = languagePair.targetCode(forSource: source)
         let status = await LanguageAvailability().status(from: Locale.Language(identifier: source), to: Locale.Language(identifier: target))
         guard status == .installed else {
-            throw AppleTranslatorError.notInstalled(Languages.displayName(forCode: source), Languages.displayName(forCode: target))
+            throw AppleTranslatorError.notInstalled(source: source, target: target)
         }
         let response = try await session(from: source, to: target).translate(text)
         return AppleTranslation(

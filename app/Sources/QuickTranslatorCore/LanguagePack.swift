@@ -46,3 +46,28 @@ public enum LanguagePackAdvice: Equatable, Sendable {
         }
     }
 }
+
+public enum AppleTranslatorError: LocalizedError, Equatable {
+    case unknownLanguage
+    case notInstalled(source: String, target: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .unknownLanguage:
+            return "No se ha podido detectar el idioma."
+        case .notInstalled(let source, let target):
+            let sourceName = Languages.displayName(forCode: source)
+            let targetName = Languages.displayName(forCode: target)
+            return "Falta descargar \(sourceName) → \(targetName) para traducir en el Mac."
+        }
+    }
+
+    public var offersLanguageDownload: Bool {
+        if case .notInstalled = self { return true }
+        return false
+    }
+
+    public static func offersLanguageDownload(_ error: Error) -> Bool {
+        (error as? AppleTranslatorError)?.offersLanguageDownload ?? false
+    }
+}

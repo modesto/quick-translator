@@ -47,3 +47,20 @@ struct LanguagePackAdviceTests {
         #expect(LanguagePackAdvice.settingsURL.absoluteString == "x-apple.systempreferences:com.apple.Localization-Settings.extension")
     }
 }
+
+@Suite("AppleTranslatorError")
+struct AppleTranslatorErrorTests {
+    @Test("a missing language offers the download and names both languages")
+    func notInstalled() {
+        let error = AppleTranslatorError.notInstalled(source: "es", target: "hi")
+        #expect(error.offersLanguageDownload)
+        #expect(error.errorDescription == "Falta descargar Español → Hindi para traducir en el Mac.")
+    }
+
+    @Test("other failures do not offer the download")
+    func otherErrors() {
+        #expect(AppleTranslatorError.unknownLanguage.offersLanguageDownload == false)
+        #expect(AppleTranslatorError.offersLanguageDownload(TranslatorError.serverStopped) == false)
+        #expect(AppleTranslatorError.offersLanguageDownload(AppleTranslatorError.notInstalled(source: "es", target: "fr")))
+    }
+}
