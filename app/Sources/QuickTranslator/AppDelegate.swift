@@ -1,12 +1,21 @@
 import AppKit
 import ApplicationServices
+import QuickTranslatorCore
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var hotKey: HotKey?
-    private let coordinator = TranslationCoordinator()
+    private let settings: AppSettings
+    private let coordinator: TranslationCoordinator
     private let serviceProvider = ServiceProvider()
+
+    override init() {
+        let settings = AppSettings()
+        self.settings = settings
+        coordinator = TranslationCoordinator(settings: settings)
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
@@ -31,6 +40,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         translateItem.target = self
         menu.addItem(translateItem)
         menu.addItem(.separator())
+        let automaticClaudeItem = NSMenuItem(title: "Traducir con Claude automáticamente", action: #selector(toggleAutomaticClaude(_:)), keyEquivalent: "")
+        automaticClaudeItem.target = self
+        automaticClaudeItem.state = settings.automaticClaude ? .on : .off
+        menu.addItem(automaticClaudeItem)
+        menu.addItem(.separator())
         let accessibilityItem = NSMenuItem(title: "Permiso de Accesibilidad…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
         accessibilityItem.target = self
         menu.addItem(accessibilityItem)
@@ -42,6 +56,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func translateFromMenu() {
         coordinator.translateCurrentSelection()
+    }
+
+    @objc private func toggleAutomaticClaude(_ sender: NSMenuItem) {
+        settings.automaticClaude.toggle()
+        sender.state = settings.automaticClaude ? .on : .off
     }
 
     @objc private func openAccessibilitySettings() {

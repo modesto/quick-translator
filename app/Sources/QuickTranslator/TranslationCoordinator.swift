@@ -6,10 +6,12 @@ final class TranslationCoordinator {
     private let translator = Translator()
     private let appleTranslator = AppleTranslator()
     private let popup = PopupController()
+    private let settings: AppSettings
     private var targetApplication: NSRunningApplication?
     private var currentText = ""
 
-    init() {
+    init(settings: AppSettings) {
+        self.settings = settings
         popup.onChoose = { [weak self] text in self?.apply(text) }
         popup.onRequestClaude = { [weak self] in self?.requestClaude() }
         popup.onClose = { [weak self] in
@@ -52,6 +54,7 @@ final class TranslationCoordinator {
             case .failure(let error): self?.popup.showApple(.failed(error.localizedDescription))
             }
         }
+        if settings.automaticClaude { requestClaude() }
     }
 
     private func requestClaude() {
