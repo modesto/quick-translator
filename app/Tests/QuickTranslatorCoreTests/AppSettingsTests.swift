@@ -49,4 +49,26 @@ struct AppSettingsTests {
         defaults.set(try JSONEncoder().encode(invalid), forKey: AppSettings.shortcutKey)
         #expect(AppSettings(defaults: defaults).shortcut == .default)
     }
+
+    @Test("uses Spanish → English until another pair is saved")
+    func defaultLanguagePair() {
+        #expect(AppSettings(defaults: Self.freshDefaults()).languagePair == .default)
+    }
+
+    @Test("remembers the language pair across instances")
+    func persistsLanguagePair() {
+        let defaults = Self.freshDefaults()
+        AppSettings(defaults: defaults).languagePair = LanguagePair(mine: "es", target: "fr")
+        #expect(AppSettings(defaults: defaults).languagePair == LanguagePair(mine: "es", target: "fr"))
+    }
+
+    @Test("falls back to the default pair when the saved one is corrupt or invalid")
+    func ignoresBadLanguagePair() throws {
+        let defaults = Self.freshDefaults()
+        defaults.set(Data("{".utf8), forKey: AppSettings.languagePairKey)
+        #expect(AppSettings(defaults: defaults).languagePair == .default)
+
+        defaults.set(try JSONEncoder().encode(LanguagePair(mine: "es", target: "es")), forKey: AppSettings.languagePairKey)
+        #expect(AppSettings(defaults: defaults).languagePair == .default)
+    }
 }

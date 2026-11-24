@@ -10,6 +10,7 @@ describe("parseOptions", () => {
     assert.equal(parsed.server, false);
     assert.deepEqual(parsed.options, {
       targetLanguage: undefined,
+      languagePair: { mine: "Spanish", target: "English" },
       count: 4,
       model: "claude-haiku-5-5",
       effort: "low",
@@ -25,6 +26,7 @@ describe("parseOptions", () => {
     assert.equal(parsed.server, true);
     assert.deepEqual(parsed.options, {
       targetLanguage: "French",
+      languagePair: { mine: "Spanish", target: "English" },
       count: 2,
       model: "claude-opus-5-5",
       effort: "high",
@@ -40,6 +42,21 @@ describe("parseOptions", () => {
   it("accepts the count limits", () => {
     assert.equal(parseOptions(["-n", "1"]).options.count, 1);
     assert.equal(parseOptions(["-n", "8"]).options.count, 8);
+  });
+
+  it("reads the language pair", () => {
+    assert.deepEqual(parseOptions(["--mine", "English", "--target", "French"]).options.languagePair, {
+      mine: "English",
+      target: "French",
+    });
+  });
+
+  it("fills a missing side of the pair with its default", () => {
+    assert.deepEqual(parseOptions(["--target", "French"]).options.languagePair, { mine: "Spanish", target: "French" });
+  });
+
+  it("rejects the same language on both sides", () => {
+    assert.throws(() => parseOptions(["--target", "spanish"]), /must be different languages/);
   });
 
   it("rejects an unknown effort", () => {

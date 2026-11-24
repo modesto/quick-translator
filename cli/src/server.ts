@@ -1,12 +1,19 @@
 import { createInterface } from "node:readline";
 import { isValidCount, MAX_COUNT } from "./options.js";
-import { WarmTranslator, type EngineOptions, type RequestOptions, type TranslationResult } from "./translate.js";
+import {
+  WarmTranslator,
+  type EngineOptions,
+  type LanguagePair,
+  type RequestOptions,
+  type TranslationResult,
+} from "./translate.js";
 
 export interface ServerRequest {
   id: string;
   text: string;
   to?: string;
   count?: number;
+  languagePair?: LanguagePair;
 }
 
 export interface ServerTranslator {
@@ -32,19 +39,32 @@ export function parseRequest(line: string): ServerRequest {
   if (request.count !== undefined && !isValidCount(request.count)) {
     throw new Error(`'count' must be an integer between 1 and ${MAX_COUNT}`);
   }
+  const languagePair = parseLanguagePair(request.mine, request.target);
   return {
     id: request.id,
     text: request.text,
     to: typeof request.to === "string" ? request.to : undefined,
     count: request.count as number | undefined,
+    languagePair,
   };
+}
+
+function parseLanguagePair(mine: unknown, target: unknown): LanguagePair | undefined {
+  if (mine === undefined && target === undefined) return undefined;
+  if (typeof mine !== "string" || !mine.trim() || typeof target !== "string" || !target.trim()) {
+    throw new Error("'mine' and 'target' must be given together as non-empty strings");
+  }
+  if (mine.trim().toLowerCase() === target.trim().toLowerCase()) {
+    throw new Error("'mine' and 'target' must be different languages");
+  }
+  return { mine: mine.trim(), target: target.trim() };
 }
 
 export async function serve(
   translator: ServerTranslator,
   lines: AsyncIterable<string>,
   send: Send,
-  settings: { model: string; defaultCount: number },
+  settings: { model: string; defaultCount: number; defaultLanguagePair?: LanguagePair },
 ): Promise<void> {
   translator.warmUp().then(
     () => send({ ready: true, model: settings.model }),
@@ -63,7 +83,11 @@ export async function serve(
     }
 
     const work = translator
-      .translate(request.text, { targetLanguage: request.to, count: request.count ?? settings.defaultCount })
+      .translate(request.text, {
+        targetLanguage: request.to,
+        count: request.count ?? settings.defaultCount,
+        languagePair: request.languagePair ?? settings.defaultLanguagePair,
+      })
       .then(
         (result) => send({ id: request.id, model: settings.model, result }),
         (error: unknown) => send({ id: request.id, error: errorMessage(error) }),
@@ -76,12 +100,12 @@ export async function serve(
   await translator.close();
 }
 
-export async function runServer(engine: EngineOptions, defaultCount: number): Promise<void> {
+export async function runServer(engine: EngineOptions, defaultCount: number, defaultLanguagePair?: LanguagePair): Promise<void> {
   await serve(
     new WarmTranslator(engine),
     createInterface({ input: process.stdin }),
     (message) => process.stdout.write(JSON.stringify(message) + "\n"),
-    { model: engine.model, defaultCount },
+    { model: engine.model, defaultCount, defaultLanguagePair },
   );
   process.exit(0);
 }

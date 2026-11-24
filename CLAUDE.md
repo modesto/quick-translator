@@ -9,7 +9,7 @@ macOS menu bar app that translates the selected text in any app and replaces it 
   - `src/server.ts` — `--server` mode: newline-delimited JSON over stdin/stdout. `serve()` takes its translator, input and output so tests can inject fakes.
   - `src/options.ts` — argument parsing and defaults (model `claude-haiku-5-5`, 4 variants, effort `low`).
 - `app/` — Swift package, macOS 26+.
-  - `Sources/QuickTranslatorCore/` — pure, testable logic: models, popup placement, server line protocol and request routing, choice keys, model names, language rules, settings, shortcut formatting/validation and `ShortcutManager` (register, fall back, persist) behind the `HotKeyRegistering` protocol.
+  - `Sources/QuickTranslatorCore/` — pure, testable logic: models, popup placement, server line protocol and request routing, choice keys, model names, language rules, settings, language pair, shortcut formatting/validation and `ShortcutManager` (register, fall back, persist) behind the `HotKeyRegistering` protocol.
   - `Sources/QuickTranslator/` — AppKit/SwiftUI glue: menu bar item, global hotkey (default ⌥⌘T, configurable from the menu), macOS Service, Accessibility selection reading, paste-based replacement, popup, Apple Translation, CLI server process.
 - `scripts/build-app.sh` — builds the CLI and the app, writes `Info.plist` and signs the bundle; `--install` copies it to `~/Applications`, refreshes Services and launches it.
 - `scripts/test.sh` — runs both test suites.
@@ -36,6 +36,7 @@ macOS menu bar app that translates the selected text in any app and replaces it 
 - `Info.plist` stores absolute paths to `node` and `cli/dist/cli.js` (`QTNodePath`, `QTCLIPath`). Moving the repo or changing the Node install needs a rebuild.
 - The bundle is signed with the identity in `CODESIGN_IDENTITY` (ad-hoc when unset). An ad-hoc signature changes on every build and makes macOS drop the Accessibility permission, so set it to a stable code signing certificate.
 - Selection replacement pastes through the clipboard (simulated ⌘V) and restores it afterwards; it works in native and Electron apps. Reading the selection tries Accessibility first and falls back to a simulated ⌘C.
-- Server protocol: request `{"id","text","to"?,"count"?}`; responses `{"id","model","result"}` or `{"id","error"}`; one `{"ready","model"}` message at start. The app ignores answers to cancelled or replaced requests.
-- Apple Translation uses `TranslationSession(installedSource:target:)`, so it only works with downloaded languages and never shows system UI. It returns a single translation; it cannot produce variants.
+- Language pair: "mine" and "target". Text in "mine" goes to "target", anything else to "mine". The app detects the language for Apple Translation with `NLLanguageRecognizer`; for Claude it sends both languages by English name and lets Claude apply the rule.
+- Server protocol: request `{"id","text","to"?,"mine"?,"target"?,"count"?}` (`mine` and `target` go together; `to` forces one target); responses `{"id","model","result"}` or `{"id","error"}`; one `{"ready","model"}` message at start. The app ignores answers to cancelled or replaced requests.
+- Apple Translation uses `TranslationSession(installedSource:target:)`, so it only works with downloaded languages and never shows system UI. When the language pair changes, `LanguageAvailability` is checked in both directions and `LanguagePackAdvice` decides whether to offer opening Language & Region (`x-apple.systempreferences:com.apple.Localization-Settings.extension`; there is no deep link to the Translation Languages sheet). It returns a single translation; it cannot produce variants.
 - The warm Claude Code process uses about 270 MB while idle.

@@ -41,7 +41,13 @@ function responses(sent) {
 
 describe("parseRequest", () => {
   it("parses a minimal request", () => {
-    assert.deepEqual(parseRequest('{"id":"1","text":"hola"}'), { id: "1", text: "hola", to: undefined, count: undefined });
+    assert.deepEqual(parseRequest('{"id":"1","text":"hola"}'), {
+      id: "1",
+      text: "hola",
+      to: undefined,
+      count: undefined,
+      languagePair: undefined,
+    });
   });
 
   it("keeps the optional target language and count", () => {
@@ -50,6 +56,14 @@ describe("parseRequest", () => {
       text: "hola",
       to: "French",
       count: 2,
+      languagePair: undefined,
+    });
+  });
+
+  it("reads the language pair", () => {
+    assert.deepEqual(parseRequest('{"id":"1","text":"hola","mine":" Spanish ","target":"French"}').languagePair, {
+      mine: "Spanish",
+      target: "French",
     });
   });
 
@@ -63,6 +77,10 @@ describe("parseRequest", () => {
     "a zero count": ['{"id":"1","text":"hola","count":0}', /'count' must be an integer between 1 and 8/],
     "a fractional count": ['{"id":"1","text":"hola","count":1.5}', /'count'/],
     "a string count": ['{"id":"1","text":"hola","count":"2"}', /'count'/],
+    "only mine": ['{"id":"1","text":"hola","mine":"Spanish"}', /given together/],
+    "only target": ['{"id":"1","text":"hola","target":"French"}', /given together/],
+    "an empty target": ['{"id":"1","text":"hola","mine":"Spanish","target":" "}', /given together/],
+    "the same language twice": ['{"id":"1","text":"hola","mine":"Spanish","target":"spanish"}', /different languages/],
   };
 
   for (const [name, [line, expected]] of Object.entries(invalid)) {
@@ -91,9 +109,25 @@ describe("serve", () => {
     await run(translator, '{"id":"a","text":"hola","to":"French"}', '{"id":"b","text":"hola","count":2}');
 
     assert.deepEqual(translator.calls.map((call) => call.request), [
-      { targetLanguage: "French", count: 4 },
-      { targetLanguage: undefined, count: 2 },
+      { targetLanguage: "French", count: 4, languagePair: undefined },
+      { targetLanguage: undefined, count: 2, languagePair: undefined },
     ]);
+  });
+
+  it("uses the request's language pair, or the server default when it has none", async () => {
+    const translator = fakeTranslator();
+    const defaultLanguagePair = { mine: "Spanish", target: "German" };
+    await serve(
+      translator,
+      linesOf('{"id":"a","text":"hola","mine":"Spanish","target":"French"}', '{"id":"b","text":"hola"}'),
+      () => {},
+      { ...SETTINGS, defaultLanguagePair },
+    );
+
+    assert.deepEqual(
+      translator.calls.map((call) => call.request.languagePair),
+      [{ mine: "Spanish", target: "French" }, defaultLanguagePair],
+    );
   });
 
   it("reports a translation failure under the request id", async () => {

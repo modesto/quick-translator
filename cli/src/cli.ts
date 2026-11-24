@@ -11,11 +11,15 @@ Prints a JSON object with several translation variants.
 
 With --server, stays running and keeps Claude Code warm. Reads one JSON
 request per line on stdin ({"id": "1", "text": "...", "to"?: "French",
-"count"?: 4}) and writes one JSON response per line on stdout
-({"id": "1", "result": {...}} or {"id": "1", "error": "..."}).
+"mine"?: "Spanish", "target"?: "English", "count"?: 4}) and writes one
+JSON response per line on stdout ({"id": "1", "result": {...}} or
+{"id": "1", "error": "..."}).
 
 Options:
-  -t, --to <language>    Target language (default: English if the text is Spanish, otherwise Spanish)
+  -t, --to <language>    Always translate into this language, ignoring --mine/--target
+      --mine <language>    Your language (default: Spanish)
+      --target <language>  Language for text written in yours (default: English);
+                           text in any other language is translated into yours
   -n, --count <n>        Number of variants (default: 4)
   -m, --model <model>    Claude model (default: claude-haiku-5-5)
   -e, --effort <level>   low | medium | high (default: low)
@@ -36,7 +40,7 @@ async function main(): Promise<void> {
     return;
   }
   if (server) {
-    await runServer({ model: options.model, effort: options.effort }, options.count);
+    await runServer({ model: options.model, effort: options.effort }, options.count, options.languagePair);
     return;
   }
 

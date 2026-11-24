@@ -5,8 +5,16 @@ export interface EngineOptions {
   effort: "low" | "medium" | "high";
 }
 
+export interface LanguagePair {
+  mine: string;
+  target: string;
+}
+
+export const DEFAULT_LANGUAGE_PAIR: LanguagePair = { mine: "Spanish", target: "English" };
+
 export interface RequestOptions {
   targetLanguage?: string;
+  languagePair?: LanguagePair;
   count: number;
 }
 
@@ -69,10 +77,11 @@ function queryOptions(engine: EngineOptions): Options {
   };
 }
 
-function buildPrompt(text: string, request: RequestOptions): string {
+export function buildPrompt(text: string, request: RequestOptions): string {
+  const pair = request.languagePair ?? DEFAULT_LANGUAGE_PAIR;
   const target = request.targetLanguage
     ? `Target language: ${request.targetLanguage}.`
-    : "Target language: English if the text is in Spanish; otherwise Spanish.";
+    : `Target language: ${pair.target} if the text is in ${pair.mine}; otherwise ${pair.mine}.`;
   return `${target}
 Number of variants: ${request.count}.
 

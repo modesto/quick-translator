@@ -21,19 +21,19 @@ final class AppleTranslator {
     private var sessions: [String: TranslationSession] = [:]
     private var currentTask: Task<Void, Never>?
 
-    func warmUp() {
+    func warmUp(_ pair: LanguagePair) {
         Task {
-            _ = try? await session(from: "es", to: "en").translate("Hola")
-            _ = try? await session(from: "en", to: "es").translate("Hello")
+            _ = try? await session(from: pair.mine, to: pair.target).translate("Hola")
+            _ = try? await session(from: pair.target, to: pair.mine).translate("Hello")
         }
     }
 
-    func translate(_ text: String, completion: @escaping (Result<AppleTranslation, Error>) -> Void) {
+    func translate(_ text: String, languagePair: LanguagePair, completion: @escaping (Result<AppleTranslation, Error>) -> Void) {
         cancel()
         currentTask = Task {
             let result: Result<AppleTranslation, Error>
             do {
-                result = .success(try await translate(text))
+                result = .success(try await translate(text, languagePair: languagePair))
             } catch {
                 result = .failure(error)
             }
@@ -47,9 +47,29 @@ final class AppleTranslator {
         currentTask = nil
     }
 
-    private func translate(_ text: String) async throws -> AppleTranslation {
+    func languagePackAdvice(for pair: LanguagePair) async -> LanguagePackAdvice {
+        let availability = LanguageAvailability()
+        let mine = Locale.Language(identifier: pair.mine)
+        let target = Locale.Language(identifier: pair.target)
+        let statuses = [
+            await availability.status(from: mine, to: target),
+            await availability.status(from: target, to: mine),
+        ]
+        return LanguagePackAdvice.evaluate(statuses.map(Self.packStatus))
+    }
+
+    private static func packStatus(_ status: LanguageAvailability.Status) -> LanguagePackStatus {
+        switch status {
+        case .installed: return .installed
+        case .supported: return .downloadable
+        case .unsupported: return .unsupported
+        @unknown default: return .unsupported
+        }
+    }
+
+    private func translate(_ text: String, languagePair: LanguagePair) async throws -> AppleTranslation {
         guard let source = Languages.dominantLanguageCode(of: text) else { throw AppleTranslatorError.unknownLanguage }
-        let target = Languages.targetLanguageCode(forSource: source)
+        let target = languagePair.targetCode(forSource: source)
         let status = await LanguageAvailability().status(from: Locale.Language(identifier: source), to: Locale.Language(identifier: target))
         guard status == .installed else {
             throw AppleTranslatorError.notInstalled(Languages.displayName(forCode: source), Languages.displayName(forCode: target))

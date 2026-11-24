@@ -3,10 +3,14 @@ import Foundation
 public struct ServerRequest: Encodable, Equatable {
     public let id: String
     public let text: String
+    public let mine: String
+    public let target: String
 
-    public init(id: String, text: String) {
+    public init(id: String, text: String, languagePair: LanguagePair) {
         self.id = id
         self.text = text
+        mine = Languages.englishName(forCode: languagePair.mine)
+        target = Languages.englishName(forCode: languagePair.target)
     }
 
     public func encodedLine() throws -> Data {

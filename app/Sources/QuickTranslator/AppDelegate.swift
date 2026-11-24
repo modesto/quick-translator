@@ -60,6 +60,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         automaticClaudeItem.state = settings.automaticClaude ? .on : .off
         menu.addItem(automaticClaudeItem)
         menu.addItem(.separator())
+        menu.addItem(languageMenuItem(title: "Mi idioma", action: #selector(selectMyLanguage(_:))))
+        menu.addItem(languageMenuItem(title: "Idioma destino", action: #selector(selectTargetLanguage(_:))))
+        menu.addItem(.separator())
         let accessibilityItem = NSMenuItem(title: "Permiso de Accesibilidad…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
         accessibilityItem.target = self
         menu.addItem(accessibilityItem)
@@ -67,6 +70,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
+        refreshLanguageMenus()
+    }
+
+    private var languageItems: [NSMenuItem] = []
+
+    private func languageMenuItem(title: String, action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+        let codes = Languages.supportedCodes.sorted { Languages.displayName(forCode: $0) < Languages.displayName(forCode: $1) }
+        for code in codes {
+            let languageItem = NSMenuItem(title: Languages.displayName(forCode: code), action: action, keyEquivalent: "")
+            languageItem.target = self
+            languageItem.representedObject = code
+            submenu.addItem(languageItem)
+        }
+        item.submenu = submenu
+        item.representedObject = title
+        languageItems.append(item)
+        return item
+    }
+
+    private func refreshLanguageMenus() {
+        let pair = settings.languagePair
+        for item in languageItems {
+            let title = item.representedObject as? String ?? ""
+            let selected = title == "Mi idioma" ? pair.mine : pair.target
+            item.title = "\(title): \(Languages.displayName(forCode: selected))"
+            for languageItem in item.submenu?.items ?? [] {
+                languageItem.state = languageItem.representedObject as? String == selected ? .on : .off
+            }
+        }
+    }
+
+    @objc private func selectMyLanguage(_ sender: NSMenuItem) {
+        guard let code = sender.representedObject as? String else { return }
+        settings.languagePair = settings.languagePair.withMine(code)
+        refreshLanguageMenus()
+        coordinator.languagePairDidChange()
+    }
+
+    @objc private func selectTargetLanguage(_ sender: NSMenuItem) {
+        guard let code = sender.representedObject as? String else { return }
+        settings.languagePair = settings.languagePair.withTarget(code)
+        refreshLanguageMenus()
+        coordinator.languagePairDidChange()
     }
 
     private func updateTranslateItem(_ shortcut: Shortcut) {

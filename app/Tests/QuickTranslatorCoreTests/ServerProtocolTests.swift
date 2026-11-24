@@ -62,13 +62,13 @@ struct LineBufferTests {
 
 @Suite("ServerRequest")
 struct ServerRequestTests {
-    @Test("encodes one JSON object terminated by a newline")
+    @Test("encodes one JSON object with the language pair in English, terminated by a newline")
     func encodesALine() throws {
-        let line = try ServerRequest(id: "1", text: "línea 1\nlínea 2").encodedLine()
+        let line = try ServerRequest(id: "1", text: "línea 1\nlínea 2", languagePair: LanguagePair(mine: "es", target: "fr")).encodedLine()
         #expect(line.last == 0x0A)
         #expect(line.dropLast().contains(0x0A) == false)
         let decoded = try JSONSerialization.jsonObject(with: line.dropLast()) as? [String: String]
-        #expect(decoded == ["id": "1", "text": "línea 1\nlínea 2"])
+        #expect(decoded == ["id": "1", "text": "línea 1\nlínea 2", "mine": "Spanish", "target": "French"])
     }
 }
 

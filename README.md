@@ -9,7 +9,7 @@ Select some text, press **⌥⌘T** (or the shortcut you set) and a popup shows:
 
 Click **Usar N** or press the number key to replace the selection. Press **Esc** or click outside to close.
 
-Spanish text is translated into English; any other language into Spanish.
+Text in your language goes to your target language, and text in any other language goes to yours. By default your language is Spanish and the target is English; change both from the menu bar icon.
 
 ## Requirements
 
@@ -17,7 +17,7 @@ Spanish text is translated into English; any other language into Spanish.
 - Xcode with Swift 6.2 or later.
 - Node.js 18.14 or later (tested with Node.js 26).
 - Claude Code installed and signed in (`claude`). Translations use your Claude Code login, so no API key is needed.
-- For Apple Translation, the Spanish and English languages downloaded in System Settings → General → Language & Region → Translation Languages.
+- For Apple Translation, both languages of your pair downloaded in System Settings → General → Language & Region → Translation Languages.
 
 ## Install
 
@@ -38,6 +38,7 @@ To keep the Accessibility permission across rebuilds, sign with a stable code si
 - **Right click → Services → Traducir con Quick Translator** — the same from the context menu.
 - **Menu bar icon**:
   - *Cambiar atajo…* — record a new shortcut, or reset it to ⌥⌘T. It needs ⌘, ⌥ or ⌃, and common ⌘ shortcuts such as ⌘C or ⌘Q are refused. If another app already owns the combination, the previous shortcut is kept.
+  - *Mi idioma* and *Idioma destino* — your language and the language text in it is translated into. Picking the other side's language swaps them. If Apple Translation is missing a language of the new pair, an alert offers to open Language & Region, where *Translation Languages…* downloads it; if Apple does not support the pair at all, only Claude translates it.
   - *Traducir con Claude automáticamente* — when on, Claude's variants are requested with every translation. When off, the popup shows a **Traducir con Claude (C)** button and Claude is only called when you press it or the **C** key.
   - *Permiso de Accesibilidad…* — opens the Accessibility settings.
 
@@ -52,12 +53,12 @@ node dist/cli.js "Nos vemos mañana a primera hora"
 echo "See you tomorrow" | node dist/cli.js --to French --count 3
 ```
 
-Options: `--to <language>`, `--count <1-8>`, `--model <id>` (default `claude-haiku-5-5`), `--effort low|medium|high`, `--server`.
+Options: `--mine <language>` (default Spanish) and `--target <language>` (default English) for the language pair, `--to <language>` to force one target, `--count <1-8>`, `--model <id>` (default `claude-haiku-5-5`), `--effort low|medium|high`, `--server`.
 
 With `--server` it stays running, keeps Claude Code warm and answers one JSON request per line:
 
 ```
-→ {"id":"1","text":"Nos vemos mañana"}
+→ {"id":"1","text":"Nos vemos mañana","mine":"Spanish","target":"English"}
 ← {"id":"1","model":"claude-haiku-5-5","result":{"sourceLanguage":"Spanish","targetLanguage":"English","variants":[{"label":"Natural","text":"See you tomorrow"}]}}
 ```
 

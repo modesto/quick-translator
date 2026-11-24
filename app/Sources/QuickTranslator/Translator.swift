@@ -14,12 +14,12 @@ final class Translator {
         try? launchServer()
     }
 
-    func translate(_ text: String, completion: @escaping ServerResponseRouter.Completion) {
+    func translate(_ text: String, languagePair: LanguagePair, completion: @escaping ServerResponseRouter.Completion) {
         let id = UUID().uuidString
         router.register(id: id, completion: completion)
         do {
             if process == nil { try launchServer() }
-            try input?.write(contentsOf: ServerRequest(id: id, text: text).encodedLine())
+            try input?.write(contentsOf: ServerRequest(id: id, text: text, languagePair: languagePair).encodedLine())
         } catch {
             router.fail(id: id, with: error)
         }
