@@ -9,8 +9,8 @@ macOS menu bar app that translates the selected text in any app and replaces it 
   - `src/server.ts` — `--server` mode: newline-delimited JSON over stdin/stdout. `serve()` takes its translator, input and output so tests can inject fakes.
   - `src/options.ts` — argument parsing and defaults (model `claude-haiku-5-5`, 4 variants, effort `low`).
 - `app/` — Swift package, macOS 26+.
-  - `Sources/QuickTranslatorCore/` — pure, testable logic: models, popup placement, server line protocol and request routing, choice keys, model names, language rules, settings.
-  - `Sources/QuickTranslator/` — AppKit/SwiftUI glue: menu bar item, global hotkey (⌥⌘T), macOS Service, Accessibility selection reading, paste-based replacement, popup, Apple Translation, CLI server process.
+  - `Sources/QuickTranslatorCore/` — pure, testable logic: models, popup placement, server line protocol and request routing, choice keys, model names, language rules, settings, shortcut formatting/validation and `ShortcutManager` (register, fall back, persist) behind the `HotKeyRegistering` protocol.
+  - `Sources/QuickTranslator/` — AppKit/SwiftUI glue: menu bar item, global hotkey (default ⌥⌘T, configurable from the menu), macOS Service, Accessibility selection reading, paste-based replacement, popup, Apple Translation, CLI server process.
 - `scripts/build-app.sh` — builds the CLI and the app, writes `Info.plist` and signs the bundle; `--install` copies it to `~/Applications`, refreshes Services and launches it.
 - `scripts/test.sh` — runs both test suites.
 

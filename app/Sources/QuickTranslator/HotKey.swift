@@ -1,15 +1,14 @@
 import AppKit
 import Carbon.HIToolbox
+import QuickTranslatorCore
 
 final class HotKey {
-    static let keyCodeT = UInt32(kVK_ANSI_T)
-
     private static let signature: OSType = 0x5154_524E
     private var hotKeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
     private let action: () -> Void
 
-    init(keyCode: UInt32, modifiers: NSEvent.ModifierFlags, action: @escaping () -> Void) {
+    init(action: @escaping () -> Void) {
         self.action = action
 
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
@@ -20,22 +19,26 @@ final class HotKey {
             DispatchQueue.main.async { hotKey.action() }
             return noErr
         }, 1, &eventType, selfPointer, &handlerRef)
-
-        let hotKeyID = EventHotKeyID(signature: Self.signature, id: 1)
-        RegisterEventHotKey(keyCode, Self.carbonModifiers(modifiers), hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
     }
 
     deinit {
-        if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
+        unregister()
         if let handlerRef { RemoveEventHandler(handlerRef) }
     }
 
-    private static func carbonModifiers(_ flags: NSEvent.ModifierFlags) -> UInt32 {
-        var result: UInt32 = 0
-        if flags.contains(.command) { result |= UInt32(cmdKey) }
-        if flags.contains(.option) { result |= UInt32(optionKey) }
-        if flags.contains(.control) { result |= UInt32(controlKey) }
-        if flags.contains(.shift) { result |= UInt32(shiftKey) }
-        return result
+    @discardableResult
+    func register(_ shortcut: Shortcut) -> Bool {
+        unregister()
+        let hotKeyID = EventHotKeyID(signature: Self.signature, id: 1)
+        let status = RegisterEventHotKey(shortcut.keyCode, shortcut.carbonModifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+        if status != noErr { hotKeyRef = nil }
+        return status == noErr
+    }
+
+    func unregister() {
+        if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
+        hotKeyRef = nil
     }
 }
+
+extension HotKey: HotKeyRegistering {}

@@ -5,23 +5,34 @@ import QuickTranslatorCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
-    private var hotKey: HotKey?
+    private var translateItem: NSMenuItem?
     private let settings: AppSettings
     private let coordinator: TranslationCoordinator
+    private let hotKey: HotKey
+    private let shortcuts: ShortcutManager
+    private let shortcutWindow: ShortcutWindowController
     private let serviceProvider = ServiceProvider()
 
     override init() {
         let settings = AppSettings()
+        let coordinator = TranslationCoordinator(settings: settings)
+        let hotKey = HotKey { coordinator.translateCurrentSelection() }
+        let shortcuts = ShortcutManager(settings: settings, hotKey: hotKey)
         self.settings = settings
-        coordinator = TranslationCoordinator(settings: settings)
+        self.coordinator = coordinator
+        self.hotKey = hotKey
+        self.shortcuts = shortcuts
+        shortcutWindow = ShortcutWindowController(manager: shortcuts)
         super.init()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
-        hotKey = HotKey(keyCode: HotKey.keyCodeT, modifiers: [.command, .option]) { [weak self] in
-            self?.coordinator.translateCurrentSelection()
+        if !shortcuts.activate() {
+            NSSound.beep()
+            shortcutWindow.show()
         }
+        shortcutWindow.onChange = { [weak self] shortcut in self?.updateTranslateItem(shortcut) }
         serviceProvider.onText = { [weak self] text in
             self?.coordinator.translate(text: text, anchor: nil)
         }
@@ -35,10 +46,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.image = NSImage(systemSymbolName: "character.bubble", accessibilityDescription: "Quick Translator")
 
         let menu = NSMenu()
-        let translateItem = NSMenuItem(title: "Traducir selección", action: #selector(translateFromMenu), keyEquivalent: "t")
-        translateItem.keyEquivalentModifierMask = [.command, .option]
+        let translateItem = NSMenuItem(title: "Traducir selección", action: #selector(translateFromMenu), keyEquivalent: "")
         translateItem.target = self
         menu.addItem(translateItem)
+        self.translateItem = translateItem
+        updateTranslateItem(shortcuts.current)
+        let shortcutItem = NSMenuItem(title: "Cambiar atajo…", action: #selector(openShortcutWindow), keyEquivalent: "")
+        shortcutItem.target = self
+        menu.addItem(shortcutItem)
         menu.addItem(.separator())
         let automaticClaudeItem = NSMenuItem(title: "Traducir con Claude automáticamente", action: #selector(toggleAutomaticClaude(_:)), keyEquivalent: "")
         automaticClaudeItem.target = self
@@ -52,6 +67,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
+    }
+
+    private func updateTranslateItem(_ shortcut: Shortcut) {
+        guard let translateItem else { return }
+        if let keyEquivalent = shortcut.menuKeyEquivalent {
+            translateItem.title = "Traducir selección"
+            translateItem.keyEquivalent = keyEquivalent
+            translateItem.keyEquivalentModifierMask = Self.modifierFlags(shortcut.modifiers)
+        } else {
+            translateItem.title = "Traducir selección (\(shortcut.displayString))"
+            translateItem.keyEquivalent = ""
+        }
+    }
+
+    private static func modifierFlags(_ modifiers: Shortcut.Modifiers) -> NSEvent.ModifierFlags {
+        var flags: NSEvent.ModifierFlags = []
+        if modifiers.contains(.command) { flags.insert(.command) }
+        if modifiers.contains(.option) { flags.insert(.option) }
+        if modifiers.contains(.control) { flags.insert(.control) }
+        if modifiers.contains(.shift) { flags.insert(.shift) }
+        return flags
+    }
+
+    @objc private func openShortcutWindow() {
+        shortcutWindow.show()
     }
 
     @objc private func translateFromMenu() {

@@ -2,7 +2,7 @@
 
 Translate the text you have selected in any Mac app and replace it with the translation you pick.
 
-Select some text, press **⌥⌘T** and a popup shows:
+Select some text, press **⌥⌘T** (or the shortcut you set) and a popup shows:
 
 - **Apple Translation** — one translation made on your Mac, in about half a second.
 - **Claude** — several variants with different registers (natural, formal, informal…), in about 3 seconds.
@@ -34,9 +34,10 @@ To keep the Accessibility permission across rebuilds, sign with a stable code si
 
 ## Use
 
-- **⌥⌘T** — translate the current selection.
+- **⌥⌘T** — translate the current selection. Change it from the menu bar icon.
 - **Right click → Services → Traducir con Quick Translator** — the same from the context menu.
 - **Menu bar icon**:
+  - *Cambiar atajo…* — record a new shortcut, or reset it to ⌥⌘T. It needs ⌘, ⌥ or ⌃, and common ⌘ shortcuts such as ⌘C or ⌘Q are refused. If another app already owns the combination, the previous shortcut is kept.
   - *Traducir con Claude automáticamente* — when on, Claude's variants are requested with every translation. When off, the popup shows a **Traducir con Claude (C)** button and Claude is only called when you press it or the **C** key.
   - *Permiso de Accesibilidad…* — opens the Accessibility settings.
 

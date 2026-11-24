@@ -2,6 +2,7 @@ import Foundation
 
 public final class AppSettings {
     public static let automaticClaudeKey = "automaticClaudeTranslation"
+    public static let shortcutKey = "translateShortcut"
 
     private let defaults: UserDefaults
 
@@ -12,5 +13,15 @@ public final class AppSettings {
     public var automaticClaude: Bool {
         get { defaults.object(forKey: Self.automaticClaudeKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Self.automaticClaudeKey) }
+    }
+
+    public var shortcut: Shortcut {
+        get {
+            guard let data = defaults.data(forKey: Self.shortcutKey),
+                  let shortcut = try? JSONDecoder().decode(Shortcut.self, from: data),
+                  case .success = ShortcutValidator.validate(shortcut) else { return .default }
+            return shortcut
+        }
+        set { defaults.set(try? JSONEncoder().encode(newValue), forKey: Self.shortcutKey) }
     }
 }
