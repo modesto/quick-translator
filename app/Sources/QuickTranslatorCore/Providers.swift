@@ -36,6 +36,14 @@ public enum TranslationProviderKind: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    public var keyPage: (title: String, url: URL)? {
+        switch self {
+        case .claudeCode: return nil
+        case .claudeAPI: return ("Crear una clave en platform.claude.com", URL(string: "https://platform.claude.com/settings/keys")!)
+        case .deepL: return ("Conseguir una clave de DeepL API (hay plan gratuito)", URL(string: "https://www.deepl.com/pro-api")!)
+        }
+    }
+
     public var showsModelName: Bool { self != .deepL }
 }
 

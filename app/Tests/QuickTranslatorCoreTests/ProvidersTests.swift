@@ -19,6 +19,16 @@ struct TranslationProviderKindTests {
         #expect(TranslationProviderKind.claudeAPI.keyAccount != TranslationProviderKind.deepL.keyAccount)
     }
 
+    @Test("links to the page where each key is requested")
+    func keyPages() {
+        #expect(TranslationProviderKind.claudeCode.keyPage == nil)
+        #expect(TranslationProviderKind.deepL.keyPage?.url.absoluteString == "https://www.deepl.com/pro-api")
+        #expect(TranslationProviderKind.claudeAPI.keyPage?.url.absoluteString == "https://platform.claude.com/settings/keys")
+        for kind in TranslationProviderKind.allCases {
+            #expect((kind.keyPage != nil) == (kind.keyAccount != nil))
+        }
+    }
+
     @Test("never uses ANTHROPIC_API_KEY, which would switch Claude Code to API billing")
     func avoidsClaudeCodeVariables() {
         for kind in TranslationProviderKind.allCases {

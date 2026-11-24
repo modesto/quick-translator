@@ -267,7 +267,7 @@ private struct ProviderSettingsView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
         case .claudeAPI:
-            KeyField(model: model, kind: .claudeAPI, placeholder: "sk-ant-…", help: "Crea una clave en platform.claude.com. Se factura aparte de tu suscripción.")
+            KeyField(model: model, kind: .claudeAPI, placeholder: "sk-ant-…", help: "Se factura aparte de tu suscripción.")
             Picker("Modelo", selection: Binding(get: { model.claudeAPIModel }, set: model.selectClaudeAPIModel)) {
                 ForEach(ClaudeModelOption.all) { option in
                     Text("\(option.displayName) — \(option.note)").tag(option.id)
@@ -320,6 +320,12 @@ private struct KeyField: View {
             Text(help)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if let page = kind.keyPage {
+                Link(destination: page.url) {
+                    Label(page.title, systemImage: "arrow.up.right.square")
+                }
+                .font(.caption)
+            }
         }
     }
 }
