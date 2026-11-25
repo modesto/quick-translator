@@ -14,8 +14,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsWindow: SettingsWindowController
     private let serviceProvider = ServiceProvider()
 
+    private let settingsModel: SettingsModel
+
     override init() {
         let settings = AppSettings()
+        L10n.language = UILanguage.forLanguage(settings.languagePair.mine)
         let secrets = KeychainSecretStore()
         let translator = Translator(settings: settings, secrets: secrets)
         let coordinator = TranslationCoordinator(settings: settings, translator: translator)
@@ -34,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.hotKey = hotKey
         self.shortcuts = shortcuts
         self.recorder = recorder
+        self.settingsModel = settingsModel
         settingsWindow = SettingsWindowController(model: settingsModel, recorder: recorder)
         super.init()
     }
@@ -42,6 +46,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setUpMainMenu()
         setUpStatusItem()
         recorder.onChange = { [weak self] shortcut in self?.updateTranslateItem(shortcut) }
+        settingsModel.onUILanguageChange = { [weak self] in
+            self?.setUpMainMenu()
+            self?.rebuildStatusMenu()
+            self?.settingsWindow.refreshTitle()
+        }
         coordinator.onOpenSettings = { [weak self] tab in self?.settingsWindow.show(tab: tab) }
         if !shortcuts.activate() {
             NSSound.beep()
@@ -58,18 +67,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setUpMainMenu() {
         let mainMenu = NSMenu()
 
+        let strings = L10n.strings
         let appMenu = NSMenu(title: "Quick Translator")
-        let settingsItem = NSMenuItem(title: "Ajustes…", action: #selector(openSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: strings.settingsEllipsis, action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         appMenu.addItem(settingsItem)
         appMenu.addItem(.separator())
-        appMenu.addItem(NSMenuItem(title: "Salir de Quick Translator", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        appMenu.addItem(NSMenuItem(title: strings.quitApp, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         let appItem = NSMenuItem()
         appItem.submenu = appMenu
         mainMenu.addItem(appItem)
 
-        let editMenu = NSMenu(title: EditMenu.title)
-        for (index, section) in EditMenu.sections.enumerated() {
+        let editMenu = NSMenu(title: EditMenu.title())
+        for (index, section) in EditMenu.sections().enumerated() {
             if index > 0 { editMenu.addItem(.separator()) }
             for spec in section {
                 let item = NSMenuItem(title: spec.title, action: NSSelectorFromString(spec.action), keyEquivalent: spec.key)
@@ -92,34 +102,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setUpStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "character.bubble", accessibilityDescription: "Quick Translator")
+        statusItem = item
+        rebuildStatusMenu()
+    }
 
+    private func rebuildStatusMenu() {
+        let strings = L10n.strings
         let menu = NSMenu()
-        let translateItem = NSMenuItem(title: "Traducir selección", action: #selector(translateFromMenu), keyEquivalent: "")
+        let translateItem = NSMenuItem(title: strings.translateSelection, action: #selector(translateFromMenu), keyEquivalent: "")
         translateItem.target = self
         menu.addItem(translateItem)
         self.translateItem = translateItem
         updateTranslateItem(shortcuts.current)
-        let settingsItem = NSMenuItem(title: "Ajustes…", action: #selector(openSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: strings.settingsEllipsis, action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
         menu.addItem(.separator())
-        let accessibilityItem = NSMenuItem(title: "Permiso de Accesibilidad…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+        let accessibilityItem = NSMenuItem(title: strings.accessibilityPermission, action: #selector(openAccessibilitySettings), keyEquivalent: "")
         accessibilityItem.target = self
         menu.addItem(accessibilityItem)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Salir", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        item.menu = menu
-        statusItem = item
+        menu.addItem(NSMenuItem(title: strings.quit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        statusItem?.menu = menu
     }
 
     private func updateTranslateItem(_ shortcut: Shortcut) {
         guard let translateItem else { return }
         if let keyEquivalent = shortcut.menuKeyEquivalent {
-            translateItem.title = "Traducir selección"
+            translateItem.title = L10n.strings.translateSelection
             translateItem.keyEquivalent = keyEquivalent
             translateItem.keyEquivalentModifierMask = Self.modifierFlags(shortcut.modifiers)
         } else {
-            translateItem.title = "Traducir selección (\(shortcut.displayString))"
+            translateItem.title = "\(L10n.strings.translateSelection) (\(shortcut.displayString))"
             translateItem.keyEquivalent = ""
         }
     }

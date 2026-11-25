@@ -114,7 +114,7 @@ public final class ServerResponseRouter {
         } else if let code = message.code.flatMap(ProviderErrorCode.init(rawValue:)) {
             complete(id: id, with: .failure(TranslatorError.provider(code, message.providerKind, message.error ?? "")))
         } else {
-            complete(id: id, with: .failure(TranslatorError.failed(message.error ?? "La traducción falló.")))
+            complete(id: id, with: .failure(TranslatorError.failed(message.error ?? L10n.strings.translationFailed)))
         }
     }
 

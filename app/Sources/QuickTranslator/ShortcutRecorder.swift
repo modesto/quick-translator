@@ -47,7 +47,7 @@ final class ShortcutRecorder {
         guard !model.isRecording else { return }
         manager.pause()
         model.isRecording = true
-        model.message = "Pulsa la nueva combinación. Esc para cancelar."
+        model.message = L10n.strings.pressNewShortcut
         model.isError = false
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.record(event)
@@ -84,7 +84,7 @@ final class ShortcutRecorder {
         switch manager.change(to: shortcut) {
         case .success(let applied):
             model.current = applied
-            model.message = "Atajo cambiado a \(applied.displayString)."
+            model.message = L10n.strings.shortcutChanged(applied.displayString)
             model.isError = false
             onChange(applied)
         case .failure(let error):
@@ -123,13 +123,13 @@ struct ShortcutRecorderView: View {
                             .strokeBorder(model.isRecording ? Color.accentColor : .clear, lineWidth: 2)
                     )
                 if model.isRecording {
-                    Button("Cancelar", action: model.onCancelRecording)
+                    Button(L10n.strings.cancel, action: model.onCancelRecording)
                 } else {
-                    Button("Grabar nuevo atajo", action: model.onStartRecording)
+                    Button(L10n.strings.recordShortcut, action: model.onStartRecording)
                 }
-                Button("Restablecer", action: model.onReset)
+                Button(L10n.strings.reset, action: model.onReset)
                     .disabled(model.isRecording || model.current == .default)
-                    .help("Volver a \(Shortcut.default.displayString)")
+                    .help(L10n.strings.resetHelp(Shortcut.default.displayString))
             }
             if let message = model.message {
                 Text(message)

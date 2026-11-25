@@ -28,7 +28,8 @@ macOS menu bar app that translates the selected text in any app and replaces it 
 - Every new feature or bug fix ships with tests. Put the logic in `QuickTranslatorCore` (Swift) or in an exported, dependency-injected function (TypeScript) so it can be tested without UI, Accessibility or network, then cover it there.
 - Run `./scripts/test.sh` before every commit; all tests must pass.
 - Tests never call Claude or need Accessibility permission. Use fakes for the translator and injected `UserDefaults` for settings.
-- Code, comments, commit messages and docs are in English. User-facing UI strings are in Spanish.
+- Code, comments, commit messages and docs are in English. User-facing UI strings live only in `UIStrings` (`QuickTranslatorCore/Localization.swift`), in all six UI languages (es, en, fr, de, it, pt); never hard-code them in views or menus. Add every new string to all six.
+- Tests never change `L10n.language`: it is global and tests run in parallel. Pass a `UILanguage` explicitly (`message(in:)`, `alert(for:language:)`, `Elapsed.format(_:in:)`…).
 
 ## Things to know
 
@@ -48,4 +49,5 @@ macOS menu bar app that translates the selected text in any app and replaces it 
 - OpenAI requests go to `/v1/responses` with a strict JSON schema, `store: false`, and reasoning effort `none` (Luna and Terra) or `low` (Sol and Astra reject `none`). A custom base URL (`--openai-base-url`, Settings "URL del API"; empty means OpenAI) switches to Chat Completions with `response_format` json_schema and no reasoning fields, because compatible servers (Ollama, OpenRouter, Groq…) support it more widely; there the key is optional and the model name is free text. The app keeps one model for OpenAI and another for the compatible server (`openAIModel` / `openAICompatibleModel`). `reasoning` is only sent to model families that accept it (GPT-5+, o-series); `none` only to Luna and Terra.
 - DeepL picks the free or paid endpoint from the key (`:fx`), asks for formal and informal versions in parallel when the target supports formality, and detects the source itself: if the text is not in "mine", it translates again into "mine".
 - The warm Claude Code process uses about 270 MB while idle.
+- UI language: `UILanguage.forLanguage(languagePair.mine)`, English when "mine" has no translation. `L10n.language` is set at launch and when "mine" changes; the Settings view rebuilds with `.id(model.uiLanguage)` and the menus are rebuilt. Language names use the UI language: `Languages.displayName` (capitalized, for lists) and `Languages.name` (as written mid-sentence). The Services menu entry comes from `Info.plist` and stays in Spanish.
 - The app runs as an accessory (no Dock icon, no menu bar), so it installs a hidden main menu with an Edit menu (`EditMenu`): without it ⌘V/⌘C in text fields only beep. The Settings window switches the app to `.regular` while open so it comes to the front, and back to `.accessory` when closed.

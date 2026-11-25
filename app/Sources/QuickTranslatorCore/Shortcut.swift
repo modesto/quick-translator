@@ -33,7 +33,7 @@ public struct Shortcut: Codable, Equatable, Sendable {
         if modifiers.contains(.option) { symbols += "⌥" }
         if modifiers.contains(.shift) { symbols += "⇧" }
         if modifiers.contains(.command) { symbols += "⌘" }
-        return symbols + key
+        return symbols + (keyCode == UInt32(kVK_Space) ? L10n.strings.spaceKey : key)
     }
 
     public var carbonModifiers: UInt32 {
@@ -51,13 +51,13 @@ public struct Shortcut: Codable, Equatable, Sendable {
     }
 
     public static func keyLabel(keyCode: UInt32, characters: String?) -> String {
+        if keyCode == UInt32(kVK_Space) { return L10n.strings.spaceKey }
         if let special = specialKeys[Int(keyCode)] { return special }
         let trimmed = (characters ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "#\(keyCode)" : trimmed.uppercased()
     }
 
     private static let specialKeys: [Int: String] = [
-        kVK_Space: "Espacio",
         kVK_Return: "↩",
         kVK_Tab: "⇥",
         kVK_Delete: "⌫",
@@ -83,12 +83,14 @@ public enum ShortcutValidationError: Error, Equatable, LocalizedError {
     case needsModifier
     case reserved(String)
 
-    public var errorDescription: String? {
+    public var errorDescription: String? { message(in: L10n.language) }
+
+    public func message(in language: UILanguage) -> String {
         switch self {
         case .needsModifier:
-            return "El atajo necesita al menos ⌘, ⌥ o ⌃."
+            return language.strings.shortcutNeedsModifier
         case .reserved(let shortcut):
-            return "\(shortcut) es un atajo del sistema o de edición. Elige otro."
+            return language.strings.shortcutReserved(shortcut)
         }
     }
 }

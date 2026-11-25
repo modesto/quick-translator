@@ -112,10 +112,10 @@ final class TranslationCoordinator {
         panel.messageText = alert.title
         panel.informativeText = alert.message
         if alert.offersSettings {
-            panel.addButton(withTitle: "Abrir Ajustes")
-            panel.addButton(withTitle: "Ahora no")
+            panel.addButton(withTitle: L10n.strings.openSettings)
+            panel.addButton(withTitle: L10n.strings.notNow)
         } else {
-            panel.addButton(withTitle: "Aceptar")
+            panel.addButton(withTitle: L10n.strings.ok)
         }
         NSApp.activate()
         if panel.runModal() == .alertFirstButtonReturn, alert.offersSettings {

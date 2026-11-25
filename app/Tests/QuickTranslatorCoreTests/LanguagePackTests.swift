@@ -28,18 +28,18 @@ struct LanguagePackAdviceTests {
 
     @Test("the download alert names both languages and offers the settings")
     func downloadAlert() throws {
-        let alert = try #require(LanguagePackAdvice.needsDownload.alert(for: LanguagePair(mine: "es", target: "ja")))
+        let alert = try #require(LanguagePackAdvice.needsDownload.alert(for: LanguagePair(mine: "es", target: "ja"), language: .es))
         #expect(alert.offersSettings)
-        #expect(alert.message.contains("Español"))
-        #expect(alert.message.contains("Japonés"))
+        #expect(alert.message.contains("español"))
+        #expect(alert.message.contains("japonés"))
         #expect(alert.message.contains("Idiomas de traducción"))
     }
 
     @Test("the unsupported alert does not offer the settings")
     func unsupportedAlert() throws {
-        let alert = try #require(LanguagePackAdvice.unsupported.alert(for: LanguagePair(mine: "es", target: "vi")))
+        let alert = try #require(LanguagePackAdvice.unsupported.alert(for: LanguagePair(mine: "es", target: "vi"), language: .es))
         #expect(alert.offersSettings == false)
-        #expect(alert.message.contains("Vietnamita"))
+        #expect(alert.message.contains("vietnamita"))
     }
 
     @Test("opens Language & Region in System Settings")
@@ -60,7 +60,7 @@ struct AppleTranslatorErrorTests {
     @Test("text already in the one-off target says so and offers no download")
     func alreadyInTarget() {
         let error = AppleTranslatorError.alreadyInTarget("fr")
-        #expect(error.errorDescription == "El texto ya está en Francés.")
+        #expect(error.message(in: .es) == "El texto ya está en francés.")
         #expect(error.offersLanguageDownload == false)
     }
 

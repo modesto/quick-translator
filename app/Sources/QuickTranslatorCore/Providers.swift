@@ -43,9 +43,9 @@ public enum TranslationProviderKind: String, CaseIterable, Codable, Sendable {
     public var keyPage: (title: String, url: URL)? {
         switch self {
         case .claudeCode: return nil
-        case .claudeAPI: return ("Crear una clave en platform.claude.com", URL(string: "https://platform.claude.com/settings/keys")!)
-        case .openAI: return ("Crear una clave en platform.openai.com", URL(string: "https://platform.openai.com/api-keys")!)
-        case .deepL: return ("Conseguir una clave de DeepL API (hay plan gratuito)", URL(string: "https://www.deepl.com/pro-api")!)
+        case .claudeAPI: return (L10n.strings.createKeyAt("platform.claude.com"), URL(string: "https://platform.claude.com/settings/keys")!)
+        case .openAI: return (L10n.strings.createKeyAt("platform.openai.com"), URL(string: "https://platform.openai.com/api-keys")!)
+        case .deepL: return (L10n.strings.getDeepLKey, URL(string: "https://www.deepl.com/pro-api")!)
         }
     }
 
@@ -53,21 +53,42 @@ public enum TranslationProviderKind: String, CaseIterable, Codable, Sendable {
 }
 
 public struct ModelOption: Equatable, Sendable, Identifiable {
+    public enum Note: Sendable {
+        case fastest, fastestCheapest, moreQuality, bestQuality
+
+        public func text(in language: UILanguage) -> String {
+            let strings = language.strings
+            switch self {
+            case .fastest: return strings.fastest
+            case .fastestCheapest: return strings.fastestCheapest
+            case .moreQuality: return strings.moreQuality
+            case .bestQuality: return strings.bestQuality
+            }
+        }
+    }
+
     public let id: String
-    public let note: String
+    public let kind: Note
+
+    public var note: String { kind.text(in: L10n.language) }
+
+    public init(id: String, note: Note) {
+        self.id = id
+        self.kind = note
+    }
 
     public var displayName: String { ModelName.displayName(forModel: id) }
 
     public static let claude = [
-        ModelOption(id: "claude-haiku-5-5", note: "la más rápida"),
-        ModelOption(id: "claude-sonnet-5-5", note: "más calidad"),
-        ModelOption(id: "claude-opus-5-5", note: "la de más calidad, más lenta"),
+        ModelOption(id: "claude-haiku-5-5", note: .fastest),
+        ModelOption(id: "claude-sonnet-5-5", note: .moreQuality),
+        ModelOption(id: "claude-opus-5-5", note: .bestQuality),
     ]
 
     public static let openAI = [
-        ModelOption(id: "gpt-6-luna", note: "la más rápida y barata"),
-        ModelOption(id: "gpt-6.1-terra", note: "más calidad"),
-        ModelOption(id: "gpt-6.2-sol", note: "la de más calidad, más lenta"),
+        ModelOption(id: "gpt-6-luna", note: .fastestCheapest),
+        ModelOption(id: "gpt-6.1-terra", note: .moreQuality),
+        ModelOption(id: "gpt-6.2-sol", note: .bestQuality),
     ]
 
     public static func validated(_ id: String?, in options: [ModelOption]) -> String {
@@ -162,28 +183,29 @@ public enum ProviderErrorCode: String, Decodable, Sendable {
 
     public var opensSettings: Bool { self == .missingKey || self == .authFailed }
 
-    public func message(provider: TranslationProviderKind, detail: String) -> String {
+    public func message(provider: TranslationProviderKind, detail: String, in language: UILanguage = L10n.language) -> String {
         let name = provider.displayName
+        let strings = language.strings
         switch self {
-        case .missingKey: return "Falta la clave de \(name). Añádela en Ajustes."
-        case .authFailed: return "\(name) ha rechazado la clave. Revísala en Ajustes."
-        case .quotaExceeded: return "Se ha agotado la cuota de \(name)."
-        case .rateLimited: return "Demasiadas peticiones a \(name). Espera un momento."
-        case .unsupportedLanguage: return "\(name) no admite este idioma."
-        case .refused: return "\(name) no ha querido traducir este texto."
-        case .network: return "No se ha podido conectar con \(name)."
-        case .providerError: return "\(name) ha fallado: \(detail)"
+        case .missingKey: return strings.missingKey(name)
+        case .authFailed: return strings.authFailed(name)
+        case .quotaExceeded: return strings.quotaExceeded(name)
+        case .rateLimited: return strings.rateLimited(name)
+        case .unsupportedLanguage: return strings.unsupportedLanguage(name)
+        case .refused: return strings.refused(name)
+        case .network: return strings.network(name)
+        case .providerError: return strings.providerFailed(name, detail)
         }
     }
 }
 
 public enum Elapsed {
-    public static func format(_ seconds: TimeInterval) -> String {
+    public static func format(_ seconds: TimeInterval, in language: UILanguage = L10n.language) -> String {
         let formatter = NumberFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = language.locale
         formatter.minimumFractionDigits = 1
         formatter.maximumFractionDigits = 1
         formatter.minimumIntegerDigits = 1
-        return "\(formatter.string(from: NSNumber(value: max(seconds, 0))) ?? "0,0") s"
+        return "\(formatter.string(from: NSNumber(value: max(seconds, 0))) ?? "0") s"
     }
 }

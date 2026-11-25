@@ -12,8 +12,18 @@ public enum Languages {
         return recognizer.dominantLanguage.map { Locale.Language(identifier: $0.rawValue).languageCode?.identifier ?? $0.rawValue }
     }
 
-    public static func displayName(forCode code: String) -> String {
-        Locale(identifier: "es").localizedString(forLanguageCode: code)?.capitalized ?? code
+    public static func displayName(forCode code: String, in language: UILanguage = L10n.language) -> String {
+        name(forCode: code, in: language).capitalized(with: language.locale)
+    }
+
+    public static func name(forCode code: String, in language: UILanguage = L10n.language) -> String {
+        language.locale.localizedString(forLanguageCode: code) ?? code
+    }
+
+    public static func displayName(forEnglishName englishName: String, in language: UILanguage = L10n.language) -> String {
+        let wanted = englishName.trimmingCharacters(in: .whitespaces).lowercased()
+        guard let code = supportedCodes.first(where: { self.englishName(forCode: $0).lowercased() == wanted }) else { return englishName }
+        return displayName(forCode: code, in: language)
     }
 
     public static func englishName(forCode code: String) -> String {

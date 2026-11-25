@@ -9,12 +9,14 @@ public enum ShortcutChangeError: Error, Equatable, LocalizedError {
     case invalid(ShortcutValidationError)
     case unavailable(String)
 
-    public var errorDescription: String? {
+    public var errorDescription: String? { message(in: L10n.language) }
+
+    public func message(in language: UILanguage) -> String {
         switch self {
         case .invalid(let error):
-            return error.errorDescription
+            return error.message(in: language)
         case .unavailable(let shortcut):
-            return "\(shortcut) no está disponible: lo usa otra app o el sistema."
+            return language.strings.shortcutUnavailable(shortcut)
         }
     }
 }

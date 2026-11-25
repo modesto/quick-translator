@@ -3,7 +3,7 @@ import Testing
 
 @Suite("EditMenu")
 struct EditMenuTests {
-    private var items: [MenuItemSpec] { EditMenu.sections.flatMap { $0 } }
+    private var items: [MenuItemSpec] { EditMenu.sections(in: .es).flatMap { $0 } }
 
     @Test("gives text fields the standard editing shortcuts", arguments: [
         ("paste:", "v"), ("copy:", "c"), ("cut:", "x"), ("selectAll:", "a"), ("undo:", "z"),

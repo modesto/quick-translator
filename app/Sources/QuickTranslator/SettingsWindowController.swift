@@ -23,6 +23,9 @@ final class SettingsModel: ObservableObject {
     @Published var keyDrafts: [TranslationProviderKind: String] = [:]
     @Published var savedKeys: Set<TranslationProviderKind> = []
     @Published var testState: TestState = .idle
+    @Published private(set) var uiLanguage = L10n.language
+
+    var onUILanguageChange: (() -> Void)?
 
     let shortcut: ShortcutRecorderModel
 
@@ -134,12 +137,12 @@ final class SettingsModel: ObservableObject {
     func testProvider() {
         let kind = provider
         testState = .running
-        translator.translate("Hola, ¿nos vemos mañana a primera hora?", languagePair: settings.languagePair, provider: kind) { [weak self] result in
+        translator.translate(L10n.strings.testSentence, languagePair: settings.languagePair, provider: kind) { [weak self] result in
             guard let self, self.provider == kind else { return }
             switch result {
             case .success(let translation):
                 let first = translation.result.variants.first?.text ?? ""
-                let time = translation.elapsed.map(Elapsed.format) ?? ""
+                let time = translation.elapsed.map { Elapsed.format($0) } ?? ""
                 self.testState = .passed("\(time) · «\(first)»")
             case .failure(let error):
                 self.testState = .failed(error.localizedDescription)
@@ -151,6 +154,12 @@ final class SettingsModel: ObservableObject {
         guard pair != settings.languagePair else { return }
         settings.languagePair = pair
         languagePair = pair
+        let language = UILanguage.forLanguage(pair.mine)
+        if language != L10n.language {
+            L10n.language = language
+            uiLanguage = language
+            onUILanguageChange?()
+        }
         onLanguagePairChange()
     }
 }
@@ -183,6 +192,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         }
     }
 
+    func refreshTitle() {
+        window?.title = L10n.strings.settingsTitle
+    }
+
     func windowWillClose(_ notification: Notification) {
         recorder.stop()
         NSApp.setActivationPolicy(.accessory)
@@ -195,7 +208,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Ajustes de Quick Translator"
+        window.title = L10n.strings.settingsTitle
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.contentView = NSHostingView(rootView: SettingsView(model: model, selection: SettingsTabSelection.shared))
@@ -221,12 +234,13 @@ private struct SettingsView: View {
     var body: some View {
         TabView(selection: $selection.tab) {
             GeneralSettingsView(model: model)
-                .tabItem { Label("General", systemImage: "gearshape") }
+                .tabItem { Label(L10n.strings.generalTab, systemImage: "gearshape") }
                 .tag(SettingsTab.general)
             ProviderSettingsView(model: model)
-                .tabItem { Label("Proveedor", systemImage: "sparkles") }
+                .tabItem { Label(L10n.strings.providerTab, systemImage: "sparkles") }
                 .tag(SettingsTab.provider)
         }
+        .id(model.uiLanguage)
         .frame(width: 560, height: 500)
     }
 }
@@ -234,26 +248,26 @@ private struct SettingsView: View {
 private struct GeneralSettingsView: View {
     @ObservedObject var model: SettingsModel
 
-    private static let codes = Languages.supportedCodes.sorted {
+    private static var codes: [String] { Languages.supportedCodes.sorted {
         Languages.displayName(forCode: $0) < Languages.displayName(forCode: $1)
-    }
+    } }
 
     var body: some View {
         Form {
-            Section("Atajo de teclado") {
+            Section(L10n.strings.shortcutSection) {
                 ShortcutRecorderView(model: model.shortcut)
             }
             Section {
-                Picker("Mi idioma", selection: Binding(get: { model.languagePair.mine }, set: model.setMine)) {
+                Picker(L10n.strings.myLanguage, selection: Binding(get: { model.languagePair.mine }, set: model.setMine)) {
                     ForEach(Self.codes, id: \.self) { Text(Languages.displayName(forCode: $0)).tag($0) }
                 }
-                Picker("Idioma destino", selection: Binding(get: { model.languagePair.target }, set: model.setTarget)) {
+                Picker(L10n.strings.targetLanguage, selection: Binding(get: { model.languagePair.target }, set: model.setTarget)) {
                     ForEach(Self.codes, id: \.self) { Text(Languages.displayName(forCode: $0)).tag($0) }
                 }
             } header: {
-                Text("Idiomas")
+                Text(L10n.strings.languagesSection)
             } footer: {
-                Text("Lo que esté en tu idioma se traduce al destino; cualquier otro idioma, al tuyo.")
+                Text(L10n.strings.languagesFooter)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -268,16 +282,16 @@ private struct ProviderSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Picker("Proveedor", selection: Binding(get: { model.provider }, set: model.selectProvider)) {
+                Picker(L10n.strings.provider, selection: Binding(get: { model.provider }, set: model.selectProvider)) {
                     ForEach(TranslationProviderKind.allCases, id: \.self) { Text($0.displayName).tag($0) }
                 }
-                Toggle("Traducir automáticamente", isOn: Binding(get: { model.automatic }, set: model.setAutomatic))
+                Toggle(L10n.strings.translateAutomatically, isOn: Binding(get: { model.automatic }, set: model.setAutomatic))
             } header: {
-                Text("Varias versiones")
+                Text(L10n.strings.variantsSection)
             } footer: {
                 Text(model.automatic
-                    ? "Se pide a \(model.provider.displayName) en cada traducción, junto a Apple Translation."
-                    : "El pop-up muestra un botón para pedir las versiones a \(model.provider.displayName) (tecla C).")
+                    ? L10n.strings.automaticFooter(model.provider.displayName)
+                    : L10n.strings.manualFooter(model.provider.displayName))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -285,7 +299,7 @@ private struct ProviderSettingsView: View {
             Section(model.provider.displayName) {
                 providerDetails
                 HStack {
-                    Button("Probar", action: model.testProvider)
+                    Button(L10n.strings.test, action: model.testProvider)
                         .disabled(model.testState == .running || !model.isProviderReady)
                     testResult
                 }
@@ -298,12 +312,12 @@ private struct ProviderSettingsView: View {
     private var providerDetails: some View {
         switch model.provider {
         case .claudeCode:
-            Text("Usa tu sesión de Claude Code; no necesita clave. Modelo: Claude Haiku 5.5.")
+            Text(L10n.strings.claudeCodeDetails)
                 .font(.callout)
                 .foregroundStyle(.secondary)
         case .claudeAPI:
-            KeyField(model: model, kind: .claudeAPI, placeholder: "sk-ant-…", help: "Se factura aparte de tu suscripción.")
-            Picker("Modelo", selection: Binding(get: { model.claudeAPIModel }, set: model.selectClaudeAPIModel)) {
+            KeyField(model: model, kind: .claudeAPI, placeholder: "sk-ant-…", help: L10n.strings.billedSeparately)
+            Picker(L10n.strings.model, selection: Binding(get: { model.claudeAPIModel }, set: model.selectClaudeAPIModel)) {
                 ForEach(ModelOption.claude) { option in
                     Text("\(option.displayName) — \(option.note)").tag(option.id)
                 }
@@ -315,12 +329,12 @@ private struct ProviderSettingsView: View {
                 kind: .openAI,
                 placeholder: "sk-…",
                 help: OpenAIBaseURL.isOfficial(model.openAIBaseURL)
-                    ? "Se factura aparte, según el uso."
-                    : "Opcional si tu servidor no pide clave."
+                    ? L10n.strings.billedByUsage
+                    : L10n.strings.keyOptional
             )
             OpenAIModelField(model: model)
         case .deepL:
-            KeyField(model: model, kind: .deepL, placeholder: "xxxxxxxx-…:fx", help: "Las claves gratuitas terminan en :fx. Da una versión formal y otra informal cuando el idioma lo admite.")
+            KeyField(model: model, kind: .deepL, placeholder: "xxxxxxxx-…:fx", help: L10n.strings.deepLHelp)
         }
     }
 
@@ -349,19 +363,19 @@ private struct OpenAIBaseURLField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                TextField("URL del API", text: $model.openAIBaseURLDraft, prompt: Text(OpenAIBaseURL.default))
+                TextField(L10n.strings.apiURL, text: $model.openAIBaseURLDraft, prompt: Text(OpenAIBaseURL.default))
                     .onSubmit(model.saveOpenAIBaseURL)
-                Button("Guardar", action: model.saveOpenAIBaseURL)
+                Button(L10n.strings.save, action: model.saveOpenAIBaseURL)
                     .disabled(OpenAIBaseURL.normalized(model.openAIBaseURLDraft) == model.openAIBaseURL)
             }
             if model.openAIBaseURLInvalid {
-                Text("La URL no es válida. Debe empezar por http:// o https://.")
+                Text(L10n.strings.invalidURL)
                     .font(.caption)
                     .foregroundStyle(.red)
             } else {
                 Text(OpenAIBaseURL.isOfficial(model.openAIBaseURL)
-                    ? "Vacía, se usa la de OpenAI. Cámbiala para usar un servidor compatible (Ollama, OpenRouter, Groq…)."
-                    : "Servidor compatible: se usa su API Chat Completions. Vacía, vuelve a la de OpenAI.")
+                    ? L10n.strings.officialURLHelp
+                    : L10n.strings.compatibleURLHelp)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -374,7 +388,7 @@ private struct OpenAIModelField: View {
 
     var body: some View {
         HStack {
-            TextField("Modelo", text: $model.openAIModelDraft, prompt: Text("Nombre del modelo, p. ej. llama3.2"))
+            TextField(L10n.strings.model, text: $model.openAIModelDraft, prompt: Text(L10n.strings.modelPlaceholder))
                 .onSubmit { model.selectOpenAIModel(model.openAIModelDraft) }
             Menu {
                 ForEach(ModelOption.openAI) { option in
@@ -385,8 +399,8 @@ private struct OpenAIModelField: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .help("Modelos de OpenAI")
-            Button("Guardar") { model.selectOpenAIModel(model.openAIModelDraft) }
+            .help(L10n.strings.openAIModelsHelp)
+            Button(L10n.strings.save) { model.selectOpenAIModel(model.openAIModelDraft) }
                 .disabled(model.openAIModelDraft.trimmingCharacters(in: .whitespacesAndNewlines) == model.openAIModel)
         }
     }
@@ -401,15 +415,15 @@ private struct KeyField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                SecureField(model.savedKeys.contains(kind) ? "Clave guardada en el Llavero" : placeholder, text: Binding(
+                SecureField(model.savedKeys.contains(kind) ? L10n.strings.keySaved : placeholder, text: Binding(
                     get: { model.keyDrafts[kind] ?? "" },
                     set: { model.keyDrafts[kind] = $0 }
                 ))
                 .onSubmit { model.saveKey(for: kind) }
-                Button("Guardar") { model.saveKey(for: kind) }
+                Button(L10n.strings.save) { model.saveKey(for: kind) }
                     .disabled((model.keyDrafts[kind] ?? "").trimmingCharacters(in: .whitespaces).isEmpty)
                 if model.savedKeys.contains(kind) {
-                    Button("Borrar", role: .destructive) { model.removeKey(for: kind) }
+                    Button(L10n.strings.remove, role: .destructive) { model.removeKey(for: kind) }
                 }
             }
             Text(help)

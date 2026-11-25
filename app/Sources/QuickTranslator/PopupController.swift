@@ -215,15 +215,15 @@ private struct PopupView: View {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
             }
             .buttonStyle(.plain)
-            .help("Cerrar (Esc)")
+            .help(L10n.strings.close)
         }
     }
 
     private var appleSubtitle: String {
         if case .done(let translation) = model.apple {
-            return "En el Mac · \(translation.sourceLanguage) → \(translation.targetLanguage)"
+            return "\(L10n.strings.onDevice) · \(translation.sourceLanguage) → \(translation.targetLanguage)"
         }
-        return "En el Mac"
+        return L10n.strings.onDevice
     }
 
     private var claudeTitle: String {
@@ -235,7 +235,7 @@ private struct PopupView: View {
 
     private var claudeSubtitle: String {
         if case .done(let translation) = model.claude {
-            return "\(translation.result.sourceLanguage) → \(translation.result.targetLanguage)"
+            return "\(Languages.displayName(forEnglishName: translation.result.sourceLanguage)) → \(Languages.displayName(forEnglishName: translation.result.targetLanguage))"
         }
         return ""
     }
@@ -255,10 +255,10 @@ private struct PopupView: View {
                 FailureRow(message: message)
                 if model.appleOffersDownload {
                     Button(action: model.onOpenLanguageSettings) {
-                        Label("Descargar idioma…", systemImage: "arrow.down.circle")
+                        Label(L10n.strings.downloadLanguage, systemImage: "arrow.down.circle")
                     }
                     .controlSize(.small)
-                    .help("Abre Idioma y región; pulsa \"Idiomas de traducción…\" para descargarlo")
+                    .help(L10n.strings.downloadLanguageHelp)
                 }
             }
         case .done(let translation):
@@ -270,7 +270,7 @@ private struct PopupView: View {
     private var claudeContent: some View {
         switch model.claude {
         case .idle:
-            ClaudeRequestButton(title: "Traducir con \(model.provider.displayName)", action: model.onRequestClaude)
+            ClaudeRequestButton(title: L10n.strings.translateWith(model.provider.displayName), action: model.onRequestClaude)
         case .loading:
             LoadingRow()
         case .failed(let message):
@@ -279,11 +279,11 @@ private struct PopupView: View {
                 HStack {
                     if model.claudeOffersSettings {
                         Button(action: model.onOpenProviderSettings) {
-                            Label("Ajustes…", systemImage: "gearshape")
+                            Label(L10n.strings.settingsEllipsis, systemImage: "gearshape")
                         }
                         .controlSize(.small)
                     }
-                    ClaudeRequestButton(title: "Reintentar", action: model.onRequestClaude)
+                    ClaudeRequestButton(title: L10n.strings.retry, action: model.onRequestClaude)
                 }
             }
         case .done(let translation):
@@ -322,7 +322,7 @@ private struct ProviderSection<Content: View>: View {
                     Text(Elapsed.format(elapsed))
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.tertiary)
-                        .help("Tiempo de respuesta")
+                        .help(L10n.strings.responseTime)
                 }
             }
             content
@@ -334,13 +334,13 @@ private struct TargetLanguageMenu: View {
     let selected: String?
     let select: (String?) -> Void
 
-    private static let codes = Languages.supportedCodes.sorted {
+    private static var codes: [String] { Languages.supportedCodes.sorted {
         Languages.displayName(forCode: $0) < Languages.displayName(forCode: $1)
-    }
+    } }
 
     var body: some View {
         Menu {
-            Button("Idiomas configurados") { select(nil) }
+            Button(L10n.strings.configuredLanguages) { select(nil) }
                 .disabled(selected == nil)
             Divider()
             ForEach(Self.codes, id: \.self) { code in
@@ -362,7 +362,7 @@ private struct TargetLanguageMenu: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(selected.map { "Traduciendo a \(Languages.displayName(forCode: $0)) solo esta vez" } ?? "Traducir a otro idioma solo esta vez")
+        .help(selected.map { L10n.strings.translatingOnceTo(Languages.name(forCode: $0)) } ?? L10n.strings.translateOnceHelp)
     }
 }
 
@@ -375,7 +375,7 @@ private struct ClaudeRequestButton: View {
             Label("\(title)  (C)", systemImage: "sparkles")
         }
         .controlSize(.small)
-        .help("Pedir las versiones (tecla C)")
+        .help(L10n.strings.requestVariantsHelp)
     }
 }
 
@@ -383,7 +383,7 @@ private struct LoadingRow: View {
     var body: some View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)
-            Text("Traduciendo…").foregroundStyle(.secondary)
+            Text(L10n.strings.translating).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -419,9 +419,9 @@ private struct VariantRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
-            Button("Usar \(key)", action: choose)
+            Button(L10n.strings.use("\(key)"), action: choose)
                 .controlSize(.small)
-                .help("Sustituir la selección (tecla \(key))")
+                .help(L10n.strings.useHelp("\(key)"))
         }
     }
 }

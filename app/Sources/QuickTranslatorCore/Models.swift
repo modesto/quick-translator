@@ -69,16 +69,18 @@ public enum TranslatorError: LocalizedError, Equatable {
         return false
     }
 
-    public var errorDescription: String? {
+    public var errorDescription: String? { message(in: L10n.language) }
+
+    public func message(in language: UILanguage) -> String {
         switch self {
         case .notConfigured:
-            return "No se encuentra el CLI quick-translate (QTNodePath / QTCLIPath en Info.plist)."
+            return language.strings.cliNotFound
         case .serverStopped:
-            return "El proceso de traducción se ha detenido. Vuelve a intentarlo."
+            return language.strings.serverStopped
         case .failed(let message):
             return message
         case .provider(let code, let provider, let detail):
-            return code.message(provider: provider, detail: detail)
+            return code.message(provider: provider, detail: detail, in: language)
         }
     }
 }

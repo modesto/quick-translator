@@ -25,22 +25,23 @@ public enum LanguagePackAdvice: Equatable, Sendable {
         public let offersSettings: Bool
     }
 
-    public func alert(for pair: LanguagePair) -> Alert? {
-        let mine = Languages.displayName(forCode: pair.mine)
-        let target = Languages.displayName(forCode: pair.target)
+    public func alert(for pair: LanguagePair, language: UILanguage = L10n.language) -> Alert? {
+        let strings = language.strings
+        let mine = Languages.name(forCode: pair.mine, in: language)
+        let target = Languages.name(forCode: pair.target, in: language)
         switch self {
         case .ready:
             return nil
         case .needsDownload:
             return Alert(
-                title: "Falta descargar un idioma",
-                message: "Apple Translation necesita los idiomas \(mine) y \(target) descargados en el Mac. Hasta entonces solo traducirá Claude.\n\nEn Idioma y región, pulsa \"Idiomas de traducción…\" y descarga los que falten.",
+                title: strings.languageMissingTitle,
+                message: strings.languageMissingMessage(mine, target),
                 offersSettings: true
             )
         case .unsupported:
             return Alert(
-                title: "Apple Translation no admite este par",
-                message: "Apple Translation no traduce entre \(mine) y \(target). Para este par solo traducirá Claude.",
+                title: strings.pairUnsupportedTitle,
+                message: strings.pairUnsupportedMessage(mine, target),
                 offersSettings: false
             )
         }
@@ -52,16 +53,17 @@ public enum AppleTranslatorError: LocalizedError, Equatable {
     case alreadyInTarget(String)
     case notInstalled(source: String, target: String)
 
-    public var errorDescription: String? {
+    public var errorDescription: String? { message(in: L10n.language) }
+
+    public func message(in language: UILanguage) -> String {
+        let strings = language.strings
         switch self {
         case .unknownLanguage:
-            return "No se ha podido detectar el idioma."
+            return strings.unknownLanguage
         case .alreadyInTarget(let code):
-            return "El texto ya está en \(Languages.displayName(forCode: code))."
+            return strings.alreadyIn(Languages.name(forCode: code, in: language))
         case .notInstalled(let source, let target):
-            let sourceName = Languages.displayName(forCode: source)
-            let targetName = Languages.displayName(forCode: target)
-            return "Falta descargar \(sourceName) → \(targetName) para traducir en el Mac."
+            return strings.notInstalled(Languages.displayName(forCode: source, in: language), Languages.displayName(forCode: target, in: language))
         }
     }
 
