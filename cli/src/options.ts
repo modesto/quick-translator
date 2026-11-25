@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 import { DEFAULT_API_MODEL } from "./claudeApi.js";
-import { DEFAULT_PROVIDER, isProviderId, PROVIDER_IDS, type ProviderId } from "./providers.js";
+import { DEFAULT_OPENAI_MODEL } from "./openai.js";
+import { DEFAULT_PROVIDER, isProviderId, PROVIDER_IDS, type ApiModels, type ProviderId } from "./providers.js";
 import { DEFAULT_LANGUAGE_PAIR, type TranslateOptions } from "./translate.js";
 
 export const DEFAULT_MODEL = "claude-haiku-5-5";
@@ -13,7 +14,7 @@ export interface CliOptions {
   help: boolean;
   server: boolean;
   provider: ProviderId;
-  apiModel: string;
+  models: ApiModels;
 }
 
 export function isValidCount(count: unknown): count is number {
@@ -35,6 +36,8 @@ export function parseOptions(args: string[]): CliOptions {
       server: { type: "boolean", short: "s" },
       provider: { type: "string", short: "p" },
       "api-model": { type: "string" },
+      "openai-model": { type: "string" },
+      "openai-base-url": { type: "string" },
     },
   });
 
@@ -66,7 +69,11 @@ export function parseOptions(args: string[]): CliOptions {
     help: values.help ?? false,
     server: values.server ?? false,
     provider,
-    apiModel: values["api-model"] ?? DEFAULT_API_MODEL,
+    models: {
+      claudeApi: values["api-model"] ?? DEFAULT_API_MODEL,
+      openai: values["openai-model"] ?? DEFAULT_OPENAI_MODEL,
+      openaiBaseURL: values["openai-base-url"]?.trim() || undefined,
+    },
     options: {
       targetLanguage: values.to,
       languagePair,

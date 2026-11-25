@@ -53,8 +53,10 @@ To keep the Accessibility permission across rebuilds, sign with a stable code si
 |---|---|---|
 | Claude Code | Several registers (natural, formal, informal…) | Your Claude Code login |
 | Claude API | Several registers, with Haiku 5.5, Sonnet 5.5 or Opus 5.5 | An API key from platform.claude.com, billed separately |
+| OpenAI | Several registers, with GPT-6 Luna, GPT-6.1 Terra, GPT-6.2 Sol or any model of an OpenAI-compatible server | An API key from platform.openai.com, billed separately; optional on compatible servers |
 | DeepL | Formal and informal when the target language supports it, otherwise one | A DeepL API key; free keys end in `:fx` |
 
+- *URL del API* (OpenAI) — leave it empty for OpenAI, or point it at an OpenAI-compatible server such as Ollama (`http://localhost:11434/v1`), OpenRouter or Groq. OpenAI is called through the Responses API, other servers through Chat Completions.
 - Keys are stored in the macOS Keychain, never in files or preferences.
 - *Traducir automáticamente* — when on, the provider is asked with every translation. When off, the popup shows a **Traducir con … (C)** button.
 - *Probar* — runs a test translation with the selected provider and shows the time it took or the error.
@@ -71,7 +73,7 @@ node dist/cli.js "Nos vemos mañana a primera hora"
 echo "See you tomorrow" | node dist/cli.js --to French --count 3
 ```
 
-Options: `--provider claude-code|claude-api|deepl` (keys in `QT_ANTHROPIC_API_KEY` and `QT_DEEPL_AUTH_KEY`), `--api-model <id>` for the Claude API, `--mine <language>` (default Spanish) and `--target <language>` (default English) for the language pair, `--to <language>` to force one target, `--count <1-8>`, `--model <id>` (default `claude-haiku-5-5`), `--effort low|medium|high`, `--server`.
+Options: `--provider claude-code|claude-api|openai|deepl` (keys in `QT_ANTHROPIC_API_KEY`, `QT_OPENAI_API_KEY` and `QT_DEEPL_AUTH_KEY`), `--api-model <id>` for the Claude API, `--openai-model <id>` for OpenAI (default `gpt-6-luna`), `--openai-base-url <url>` for an OpenAI-compatible server, `--mine <language>` (default Spanish) and `--target <language>` (default English) for the language pair, `--to <language>` to force one target, `--count <1-8>`, `--model <id>` (default `claude-haiku-5-5`), `--effort low|medium|high`, `--server`.
 
 With `--server` it stays running, keeps Claude Code warm and answers one JSON request per line:
 

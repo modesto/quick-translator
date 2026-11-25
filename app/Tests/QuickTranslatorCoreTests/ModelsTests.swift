@@ -56,7 +56,16 @@ struct ModelNameTests {
         #expect(ModelName.displayName(forModel: id) == expected)
     }
 
-    @Test("leaves other ids untouched", arguments: ["gpt-5", "claude", "my-model"])
+    @Test("formats OpenAI model ids", arguments: [
+        ("gpt-6-luna", "GPT-6 Luna"),
+        ("gpt-6.1-terra", "GPT-6.1 Terra"),
+        ("gpt-6.2-sol", "GPT-6.2 Sol"),
+    ])
+    func formatsOpenAI(id: String, expected: String) {
+        #expect(ModelName.displayName(forModel: id) == expected)
+    }
+
+    @Test("leaves other ids untouched", arguments: ["claude", "my-model"])
     func passthrough(id: String) {
         #expect(ModelName.displayName(forModel: id) == id)
     }

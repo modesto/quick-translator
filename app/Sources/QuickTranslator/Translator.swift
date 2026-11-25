@@ -66,7 +66,7 @@ final class Translator {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: nodePath)
-        process.arguments = ServerLaunch.arguments(cliPath: cliPath, provider: settings.provider, apiModel: settings.claudeAPIModel)
+        process.arguments = ServerLaunch.arguments(cliPath: cliPath, provider: settings.provider, claudeAPIModel: settings.claudeAPIModel, openAIModel: settings.openAIModel, openAIBaseURL: settings.openAIBaseURL)
         process.environment = ServerLaunch.environment(base: ProcessInfo.processInfo.environment, secrets: secrets)
         let inputPipe = Pipe()
         let outputPipe = Pipe()

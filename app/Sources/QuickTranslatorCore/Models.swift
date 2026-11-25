@@ -99,6 +99,9 @@ public enum ChoiceKeys {
 public enum ModelName {
     public static func displayName(forModel id: String) -> String {
         let parts = id.split(separator: "-").map(String.init)
+        if parts.count >= 2, parts[0] == "gpt" {
+            return (["GPT-\(parts[1])"] + parts.dropFirst(2).map(\.capitalized)).joined(separator: " ")
+        }
         guard parts.count >= 2, parts[0] == "claude" else { return id }
         let family = parts[1].capitalized
         let version = parts.dropFirst(2).joined(separator: ".")

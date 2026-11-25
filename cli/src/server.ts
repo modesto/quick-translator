@@ -1,9 +1,11 @@
 import { createInterface } from "node:readline";
 import { ClaudeApiTranslator } from "./claudeApi.js";
 import { DeepLTranslator } from "./deepl.js";
+import { OpenAITranslator } from "./openai.js";
 import { isValidCount, MAX_COUNT } from "./options.js";
 import {
   API_KEY_ENV,
+  type ApiModels,
   isProviderId,
   PROVIDER_IDS,
   ProviderError,
@@ -135,13 +137,15 @@ export async function serve(registry: ProviderRegistry, lines: AsyncIterable<str
   await registry.closeAll();
 }
 
-export function defaultProviderFactory(engine: EngineOptions, apiModel: string, env: NodeJS.ProcessEnv): ProviderFactory {
+export function defaultProviderFactory(engine: EngineOptions, models: ApiModels, env: NodeJS.ProcessEnv): ProviderFactory {
   return (id) => {
     switch (id) {
       case "claude-code":
         return new WarmTranslator(engine);
       case "claude-api":
-        return new ClaudeApiTranslator(apiModel, env[API_KEY_ENV["claude-api"]]?.trim() || undefined);
+        return new ClaudeApiTranslator(models.claudeApi, env[API_KEY_ENV["claude-api"]]?.trim() || undefined);
+      case "openai":
+        return new OpenAITranslator(models.openai, env[API_KEY_ENV.openai]?.trim() || undefined, { baseURL: models.openaiBaseURL });
       case "deepl":
         return new DeepLTranslator(env[API_KEY_ENV.deepl]?.trim() || undefined);
     }
@@ -150,10 +154,10 @@ export function defaultProviderFactory(engine: EngineOptions, apiModel: string, 
 
 export async function runServer(
   engine: EngineOptions,
-  settings: ServeSettings & { apiModel: string },
+  settings: ServeSettings & { models: ApiModels },
 ): Promise<void> {
   await serve(
-    new ProviderRegistry(defaultProviderFactory(engine, settings.apiModel, process.env)),
+    new ProviderRegistry(defaultProviderFactory(engine, settings.models, process.env)),
     createInterface({ input: process.stdin }),
     (message) => process.stdout.write(JSON.stringify(message) + "\n"),
     settings,

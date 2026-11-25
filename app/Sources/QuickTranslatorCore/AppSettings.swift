@@ -6,6 +6,8 @@ public final class AppSettings {
     public static let languagePairKey = "languagePair"
     public static let providerKey = "translationProvider"
     public static let claudeAPIModelKey = "claudeAPIModel"
+    public static let openAIModelKey = "openAIModel"
+    public static let openAIBaseURLKey = "openAIBaseURL"
 
     private let defaults: UserDefaults
 
@@ -19,11 +21,28 @@ public final class AppSettings {
     }
 
     public var claudeAPIModel: String {
-        get {
-            let stored = defaults.string(forKey: Self.claudeAPIModelKey)
-            return ClaudeModelOption.all.first { $0.id == stored }?.id ?? ClaudeModelOption.default.id
-        }
+        get { ModelOption.validated(defaults.string(forKey: Self.claudeAPIModelKey), in: ModelOption.claude) }
         set { defaults.set(newValue, forKey: Self.claudeAPIModelKey) }
+    }
+
+    public var openAIModel: String {
+        get {
+            let stored = defaults.string(forKey: Self.openAIModelKey)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return stored.isEmpty ? ModelOption.openAI[0].id : stored
+        }
+        set { defaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Self.openAIModelKey) }
+    }
+
+    public var openAIBaseURL: String {
+        get { defaults.string(forKey: Self.openAIBaseURLKey).flatMap(OpenAIBaseURL.normalized) ?? OpenAIBaseURL.default }
+        set {
+            let normalized = OpenAIBaseURL.normalized(newValue) ?? OpenAIBaseURL.default
+            if normalized == OpenAIBaseURL.default {
+                defaults.removeObject(forKey: Self.openAIBaseURLKey)
+            } else {
+                defaults.set(normalized, forKey: Self.openAIBaseURLKey)
+            }
+        }
     }
 
     public var automaticClaude: Bool {

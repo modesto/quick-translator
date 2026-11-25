@@ -19,6 +19,7 @@ and writes one JSON response per line on stdout ({"id": "1", "provider": ...,
 Providers:
   claude-code   Claude through the Claude Code login (default)
   claude-api    Claude API; needs ${API_KEY_ENV["claude-api"]}
+  openai        OpenAI API; needs ${API_KEY_ENV.openai}
   deepl         DeepL; needs ${API_KEY_ENV.deepl} (keys ending in :fx use the free API)
 
 Options:
@@ -27,9 +28,12 @@ Options:
       --target <language>  Language for text written in yours (default: English);
                            text in any other language is translated into yours
   -n, --count <n>        Number of variants (default: 4)
-  -p, --provider <id>    claude-code | claude-api | deepl (default: claude-code)
+  -p, --provider <id>    claude-code | claude-api | openai | deepl (default: claude-code)
   -m, --model <model>    Claude Code model (default: claude-haiku-5-5)
       --api-model <model>  Claude API model (default: claude-haiku-5-5)
+      --openai-model <model>  OpenAI model (default: gpt-6-luna)
+      --openai-base-url <url>  OpenAI-compatible API base URL (default: https://api.openai.com/v1);
+                           other servers use Chat Completions and may need no key
   -e, --effort <level>   low | medium | high (default: low)
   -s, --server           Run as a long-lived translation server
   -h, --help             Show this help`;
@@ -42,7 +46,7 @@ async function readStdin(): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const { text: argText, options, help, server, provider, apiModel } = parseOptions(process.argv.slice(2));
+  const { text: argText, options, help, server, provider, models } = parseOptions(process.argv.slice(2));
   if (help) {
     console.log(USAGE);
     return;
@@ -50,7 +54,7 @@ async function main(): Promise<void> {
   if (server) {
     await runServer(
       { model: options.model, effort: options.effort },
-      { defaultProvider: provider, defaultCount: options.count, defaultLanguagePair: options.languagePair, apiModel },
+      { defaultProvider: provider, defaultCount: options.count, defaultLanguagePair: options.languagePair, models },
     );
     return;
   }
@@ -64,7 +68,7 @@ async function main(): Promise<void> {
   const result =
     provider === "claude-code"
       ? await translate(text, options)
-      : await defaultProviderFactory(options, apiModel, process.env)(provider).translate(text, options);
+      : await defaultProviderFactory(options, models, process.env)(provider).translate(text, options);
   process.stdout.write(JSON.stringify(result, null, 2) + "\n");
 }
 

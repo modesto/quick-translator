@@ -77,6 +77,7 @@ struct AppSettingsTests {
         let settings = AppSettings(defaults: Self.freshDefaults())
         #expect(settings.provider == .claudeCode)
         #expect(settings.claudeAPIModel == "claude-haiku-5-5")
+        #expect(settings.openAIModel == "gpt-6-luna")
     }
 
     @Test("remembers the provider and the Claude API model")
@@ -87,6 +88,40 @@ struct AppSettingsTests {
         settings.claudeAPIModel = "claude-sonnet-5-5"
         #expect(AppSettings(defaults: defaults).provider == .deepL)
         #expect(AppSettings(defaults: defaults).claudeAPIModel == "claude-sonnet-5-5")
+    }
+
+    @Test("remembers the OpenAI provider and model")
+    func persistsOpenAI() {
+        let defaults = Self.freshDefaults()
+        let settings = AppSettings(defaults: defaults)
+        settings.provider = .openAI
+        settings.openAIModel = "gpt-6.2-sol"
+        #expect(AppSettings(defaults: defaults).provider == .openAI)
+        #expect(AppSettings(defaults: defaults).openAIModel == "gpt-6.2-sol")
+    }
+
+    @Test("accepts any OpenAI-compatible model name, but not an empty one")
+    func openAIModelIsFree() {
+        let defaults = Self.freshDefaults()
+        let settings = AppSettings(defaults: defaults)
+        settings.openAIModel = " llama3.2 "
+        #expect(AppSettings(defaults: defaults).openAIModel == "llama3.2")
+        settings.openAIModel = "  "
+        #expect(AppSettings(defaults: defaults).openAIModel == "gpt-6-luna")
+    }
+
+    @Test("uses OpenAI's URL by default and when the field is left empty")
+    func openAIBaseURL() {
+        let defaults = Self.freshDefaults()
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.openAIBaseURL == "https://api.openai.com/v1")
+        settings.openAIBaseURL = "http://localhost:11434/v1/"
+        #expect(AppSettings(defaults: defaults).openAIBaseURL == "http://localhost:11434/v1")
+        settings.openAIBaseURL = ""
+        #expect(AppSettings(defaults: defaults).openAIBaseURL == "https://api.openai.com/v1")
+        #expect(defaults.object(forKey: AppSettings.openAIBaseURLKey) == nil)
+        defaults.set("ftp://x", forKey: AppSettings.openAIBaseURLKey)
+        #expect(AppSettings(defaults: defaults).openAIBaseURL == "https://api.openai.com/v1")
     }
 
     @Test("ignores an unknown provider or model")

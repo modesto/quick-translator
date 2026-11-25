@@ -98,7 +98,7 @@ describe("parseRequest", () => {
     "only target": ['{"id":"1","text":"hola","target":"French"}', /given together/],
     "an empty target": ['{"id":"1","text":"hola","mine":"Spanish","target":" "}', /given together/],
     "the same language twice": ['{"id":"1","text":"hola","mine":"Spanish","target":"spanish"}', /different languages/],
-    "an unknown provider": ['{"id":"1","text":"hola","provider":"google"}', /'provider' must be one of claude-code, claude-api, deepl/],
+    "an unknown provider": ['{"id":"1","text":"hola","provider":"google"}', /'provider' must be one of claude-code, claude-api, openai, deepl/],
   };
 
   for (const [name, [line, expected]] of Object.entries(invalid)) {
@@ -244,23 +244,27 @@ describe("serve", () => {
 
 describe("defaultProviderFactory", () => {
   const engine = { model: "claude-haiku-5-5", effort: "low" };
+  const MODELS = { claudeApi: "claude-haiku-5-5", openai: "gpt-6-luna" };
 
   it("builds each provider with its model", () => {
-    const factory = defaultProviderFactory(engine, "claude-sonnet-5-5", {});
+    const factory = defaultProviderFactory(engine, { claudeApi: "claude-sonnet-5-5", openai: "gpt-6.1-terra" }, {});
     assert.equal(factory("claude-code").model, "claude-haiku-5-5");
     assert.equal(factory("claude-api").model, "claude-sonnet-5-5");
+    assert.equal(factory("openai").model, "gpt-6.1-terra");
     assert.equal(factory("deepl").model, "deepl");
   });
 
   it("reports a missing key when the environment has none", async () => {
-    const factory = defaultProviderFactory(engine, "claude-haiku-5-5", { QT_ANTHROPIC_API_KEY: "  ", QT_DEEPL_AUTH_KEY: "" });
+    const factory = defaultProviderFactory(engine, MODELS, { QT_ANTHROPIC_API_KEY: "  ", QT_OPENAI_API_KEY: " ", QT_DEEPL_AUTH_KEY: "" });
     await assert.rejects(factory("claude-api").warmUp(), (error) => error.code === "missing_key");
+    await assert.rejects(factory("openai").warmUp(), (error) => error.code === "missing_key");
     await assert.rejects(factory("deepl").warmUp(), (error) => error.code === "missing_key");
   });
 
   it("reads the keys from the QT_ variables", async () => {
-    const factory = defaultProviderFactory(engine, "claude-haiku-5-5", { QT_ANTHROPIC_API_KEY: "sk-test", QT_DEEPL_AUTH_KEY: "k:fx" });
+    const factory = defaultProviderFactory(engine, MODELS, { QT_ANTHROPIC_API_KEY: "sk-test", QT_OPENAI_API_KEY: "sk-proj", QT_DEEPL_AUTH_KEY: "k:fx" });
     await factory("claude-api").warmUp();
+    await factory("openai").warmUp();
     await factory("deepl").warmUp();
   });
 });

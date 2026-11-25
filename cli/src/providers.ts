@@ -1,6 +1,6 @@
 import type { RequestOptions, TranslationResult } from "./translate.js";
 
-export const PROVIDER_IDS = ["claude-code", "claude-api", "deepl"] as const;
+export const PROVIDER_IDS = ["claude-code", "claude-api", "openai", "deepl"] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 export const DEFAULT_PROVIDER: ProviderId = "claude-code";
 
@@ -28,6 +28,12 @@ export const PROVIDER_ERROR_CODES = [
 ] as const;
 export type ProviderErrorCode = (typeof PROVIDER_ERROR_CODES)[number];
 
+export interface ApiModels {
+  claudeApi: string;
+  openai: string;
+  openaiBaseURL?: string;
+}
+
 export class ProviderError extends Error {
   constructor(
     readonly code: ProviderErrorCode,
@@ -40,5 +46,6 @@ export class ProviderError extends Error {
 
 export const API_KEY_ENV = {
   "claude-api": "QT_ANTHROPIC_API_KEY",
+  openai: "QT_OPENAI_API_KEY",
   deepl: "QT_DEEPL_AUTH_KEY",
 } as const;

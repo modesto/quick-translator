@@ -9,7 +9,7 @@ describe("parseOptions", () => {
     assert.equal(parsed.help, false);
     assert.equal(parsed.server, false);
     assert.equal(parsed.provider, "claude-code");
-    assert.equal(parsed.apiModel, "claude-haiku-5-5");
+    assert.deepEqual(parsed.models, { claudeApi: "claude-haiku-5-5", openai: "gpt-6-luna", openaiBaseURL: undefined });
     assert.deepEqual(parsed.options, {
       targetLanguage: undefined,
       languagePair: { mine: "Spanish", target: "English" },
@@ -64,8 +64,16 @@ describe("parseOptions", () => {
   it("reads the provider and the Claude API model", () => {
     const parsed = parseOptions(["-p", "claude-api", "--api-model", "claude-sonnet-5-5"]);
     assert.equal(parsed.provider, "claude-api");
-    assert.equal(parsed.apiModel, "claude-sonnet-5-5");
+    assert.equal(parsed.models.claudeApi, "claude-sonnet-5-5");
     assert.equal(parseOptions(["--provider", "deepl"]).provider, "deepl");
+  });
+
+  it("reads the OpenAI provider and model", () => {
+    const parsed = parseOptions(["-p", "openai", "--openai-model", "gpt-6.1-terra"]);
+    assert.equal(parsed.provider, "openai");
+    assert.equal(parsed.models.openai, "gpt-6.1-terra");
+    assert.equal(parseOptions(["--openai-base-url", " http://localhost:11434/v1 "]).models.openaiBaseURL, "http://localhost:11434/v1");
+    assert.equal(parseOptions(["--openai-base-url", ""]).models.openaiBaseURL, undefined);
   });
 
   it("rejects an unknown provider", () => {

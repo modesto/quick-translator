@@ -32,7 +32,7 @@ export interface TranslationResult {
   variants: TranslationVariant[];
 }
 
-const RESULT_SCHEMA = {
+export const RESULT_SCHEMA = {
   type: "object",
   additionalProperties: false,
   required: ["sourceLanguage", "targetLanguage", "variants"],

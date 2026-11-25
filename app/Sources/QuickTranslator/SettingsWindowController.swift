@@ -13,6 +13,11 @@ final class SettingsModel: ObservableObject {
 
     @Published var provider: TranslationProviderKind
     @Published var claudeAPIModel: String
+    @Published var openAIModel: String
+    @Published var openAIModelDraft: String
+    @Published var openAIBaseURL: String
+    @Published var openAIBaseURLDraft: String
+    @Published var openAIBaseURLInvalid = false
     @Published var automatic: Bool
     @Published var languagePair: LanguagePair
     @Published var keyDrafts: [TranslationProviderKind: String] = [:]
@@ -34,6 +39,10 @@ final class SettingsModel: ObservableObject {
         self.onLanguagePairChange = onLanguagePairChange
         provider = settings.provider
         claudeAPIModel = settings.claudeAPIModel
+        openAIModel = settings.openAIModel
+        openAIModelDraft = settings.openAIModel
+        openAIBaseURL = settings.openAIBaseURL
+        openAIBaseURLDraft = settings.openAIBaseURL
         automatic = settings.automaticClaude
         languagePair = settings.languagePair
         reloadKeys()
@@ -58,6 +67,34 @@ final class SettingsModel: ObservableObject {
         guard id != settings.claudeAPIModel else { return }
         claudeAPIModel = id
         settings.claudeAPIModel = id
+        testState = .idle
+        translator.restart()
+    }
+
+    func selectOpenAIModel(_ id: String) {
+        let id = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        openAIModelDraft = id.isEmpty ? settings.openAIModel : id
+        guard !id.isEmpty, id != settings.openAIModel else { return }
+        openAIModel = id
+        settings.openAIModel = id
+        testState = .idle
+        translator.restart()
+    }
+
+    var isProviderReady: Bool {
+        ProviderSetup.isReady(provider, hasKey: savedKeys.contains(provider), openAIBaseURL: openAIBaseURL)
+    }
+
+    func saveOpenAIBaseURL() {
+        guard let normalized = OpenAIBaseURL.normalized(openAIBaseURLDraft) else {
+            openAIBaseURLInvalid = true
+            return
+        }
+        openAIBaseURLInvalid = false
+        openAIBaseURLDraft = normalized
+        guard normalized != settings.openAIBaseURL else { return }
+        settings.openAIBaseURL = normalized
+        openAIBaseURL = normalized
         testState = .idle
         translator.restart()
     }
@@ -151,7 +188,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private func makeWindow() -> NSWindow {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 500),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -188,7 +225,7 @@ private struct SettingsView: View {
                 .tabItem { Label("Proveedor", systemImage: "sparkles") }
                 .tag(SettingsTab.provider)
         }
-        .frame(width: 520, height: 420)
+        .frame(width: 560, height: 500)
     }
 }
 
@@ -247,16 +284,12 @@ private struct ProviderSettingsView: View {
                 providerDetails
                 HStack {
                     Button("Probar", action: model.testProvider)
-                        .disabled(model.testState == .running || !isConfigured)
+                        .disabled(model.testState == .running || !model.isProviderReady)
                     testResult
                 }
             }
         }
         .formStyle(.grouped)
-    }
-
-    private var isConfigured: Bool {
-        model.provider.keyAccount == nil || model.savedKeys.contains(model.provider)
     }
 
     @ViewBuilder
@@ -269,10 +302,21 @@ private struct ProviderSettingsView: View {
         case .claudeAPI:
             KeyField(model: model, kind: .claudeAPI, placeholder: "sk-ant-…", help: "Se factura aparte de tu suscripción.")
             Picker("Modelo", selection: Binding(get: { model.claudeAPIModel }, set: model.selectClaudeAPIModel)) {
-                ForEach(ClaudeModelOption.all) { option in
+                ForEach(ModelOption.claude) { option in
                     Text("\(option.displayName) — \(option.note)").tag(option.id)
                 }
             }
+        case .openAI:
+            OpenAIBaseURLField(model: model)
+            KeyField(
+                model: model,
+                kind: .openAI,
+                placeholder: "sk-…",
+                help: OpenAIBaseURL.isOfficial(model.openAIBaseURL)
+                    ? "Se factura aparte, según el uso."
+                    : "Opcional si tu servidor no pide clave."
+            )
+            OpenAIModelField(model: model)
         case .deepL:
             KeyField(model: model, kind: .deepL, placeholder: "xxxxxxxx-…:fx", help: "Las claves gratuitas terminan en :fx. Da una versión formal y otra informal cuando el idioma lo admite.")
         }
@@ -293,6 +337,55 @@ private struct ProviderSettingsView: View {
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
                 .lineLimit(3)
+        }
+    }
+}
+
+private struct OpenAIBaseURLField: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                TextField("URL del API", text: $model.openAIBaseURLDraft, prompt: Text(OpenAIBaseURL.default))
+                    .onSubmit(model.saveOpenAIBaseURL)
+                Button("Guardar", action: model.saveOpenAIBaseURL)
+                    .disabled(OpenAIBaseURL.normalized(model.openAIBaseURLDraft) == model.openAIBaseURL)
+            }
+            if model.openAIBaseURLInvalid {
+                Text("La URL no es válida. Debe empezar por http:// o https://.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            } else {
+                Text(OpenAIBaseURL.isOfficial(model.openAIBaseURL)
+                    ? "Vacía, se usa la de OpenAI. Cámbiala para usar un servidor compatible (Ollama, OpenRouter, Groq…)."
+                    : "Servidor compatible: se usa su API Chat Completions. Vacía, vuelve a la de OpenAI.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private struct OpenAIModelField: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        HStack {
+            TextField("Modelo", text: $model.openAIModelDraft)
+                .onSubmit { model.selectOpenAIModel(model.openAIModelDraft) }
+            Menu {
+                ForEach(ModelOption.openAI) { option in
+                    Button("\(option.displayName) — \(option.note)") { model.selectOpenAIModel(option.id) }
+                }
+            } label: {
+                Image(systemName: "list.bullet")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help("Modelos de OpenAI")
+            Button("Guardar") { model.selectOpenAIModel(model.openAIModelDraft) }
+                .disabled(model.openAIModelDraft.trimmingCharacters(in: .whitespacesAndNewlines) == model.openAIModel)
         }
     }
 }

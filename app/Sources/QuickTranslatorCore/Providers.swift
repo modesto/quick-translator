@@ -3,19 +3,21 @@ import Foundation
 public enum TranslationProviderKind: String, CaseIterable, Codable, Sendable {
     case claudeCode = "claude-code"
     case claudeAPI = "claude-api"
+    case openAI = "openai"
     case deepL = "deepl"
 
     public var displayName: String {
         switch self {
         case .claudeCode: return "Claude Code"
         case .claudeAPI: return "Claude API"
+        case .openAI: return "OpenAI"
         case .deepL: return "DeepL"
         }
     }
 
     public var symbolName: String {
         switch self {
-        case .claudeCode, .claudeAPI: return "sparkles"
+        case .claudeCode, .claudeAPI, .openAI: return "sparkles"
         case .deepL: return "character.book.closed"
         }
     }
@@ -24,6 +26,7 @@ public enum TranslationProviderKind: String, CaseIterable, Codable, Sendable {
         switch self {
         case .claudeCode: return nil
         case .claudeAPI: return "anthropic-api-key"
+        case .openAI: return "openai-api-key"
         case .deepL: return "deepl-auth-key"
         }
     }
@@ -32,6 +35,7 @@ public enum TranslationProviderKind: String, CaseIterable, Codable, Sendable {
         switch self {
         case .claudeCode: return nil
         case .claudeAPI: return "QT_ANTHROPIC_API_KEY"
+        case .openAI: return "QT_OPENAI_API_KEY"
         case .deepL: return "QT_DEEPL_AUTH_KEY"
         }
     }
@@ -40,6 +44,7 @@ public enum TranslationProviderKind: String, CaseIterable, Codable, Sendable {
         switch self {
         case .claudeCode: return nil
         case .claudeAPI: return ("Crear una clave en platform.claude.com", URL(string: "https://platform.claude.com/settings/keys")!)
+        case .openAI: return ("Crear una clave en platform.openai.com", URL(string: "https://platform.openai.com/api-keys")!)
         case .deepL: return ("Conseguir una clave de DeepL API (hay plan gratuito)", URL(string: "https://www.deepl.com/pro-api")!)
         }
     }
@@ -47,19 +52,55 @@ public enum TranslationProviderKind: String, CaseIterable, Codable, Sendable {
     public var showsModelName: Bool { self != .deepL }
 }
 
-public struct ClaudeModelOption: Equatable, Sendable, Identifiable {
+public struct ModelOption: Equatable, Sendable, Identifiable {
     public let id: String
     public let note: String
 
     public var displayName: String { ModelName.displayName(forModel: id) }
 
-    public static let all = [
-        ClaudeModelOption(id: "claude-haiku-5-5", note: "la más rápida"),
-        ClaudeModelOption(id: "claude-sonnet-5-5", note: "más calidad"),
-        ClaudeModelOption(id: "claude-opus-5-5", note: "la de más calidad, más lenta"),
+    public static let claude = [
+        ModelOption(id: "claude-haiku-5-5", note: "la más rápida"),
+        ModelOption(id: "claude-sonnet-5-5", note: "más calidad"),
+        ModelOption(id: "claude-opus-5-5", note: "la de más calidad, más lenta"),
     ]
 
-    public static let `default` = all[0]
+    public static let openAI = [
+        ModelOption(id: "gpt-6-luna", note: "la más rápida y barata"),
+        ModelOption(id: "gpt-6.1-terra", note: "más calidad"),
+        ModelOption(id: "gpt-6.2-sol", note: "la de más calidad, más lenta"),
+    ]
+
+    public static func validated(_ id: String?, in options: [ModelOption]) -> String {
+        options.first { $0.id == id }?.id ?? options[0].id
+    }
+}
+
+public enum OpenAIBaseURL {
+    public static let `default` = "https://api.openai.com/v1"
+
+    /// Empty means OpenAI itself; anything else must be an http(s) URL.
+    public static func normalized(_ input: String) -> String? {
+        var trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        while trimmed.hasSuffix("/") { trimmed.removeLast() }
+        if trimmed.isEmpty { return Self.default }
+        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https", url.host?.isEmpty == false else { return nil }
+        return trimmed
+    }
+
+    public static func isOfficial(_ url: String) -> Bool {
+        URL(string: url)?.host?.lowercased() == "api.openai.com"
+    }
+}
+
+public enum ProviderSetup {
+    public static func isReady(_ provider: TranslationProviderKind, hasKey: Bool, openAIBaseURL: String) -> Bool {
+        switch provider {
+        case .claudeCode: return true
+        case .openAI: return hasKey || !OpenAIBaseURL.isOfficial(openAIBaseURL)
+        case .claudeAPI, .deepL: return hasKey
+        }
+    }
 }
 
 public protocol SecretStore: AnyObject {
@@ -82,8 +123,12 @@ public final class InMemorySecretStore: SecretStore {
 }
 
 public enum ServerLaunch {
-    public static func arguments(cliPath: String, provider: TranslationProviderKind, apiModel: String) -> [String] {
-        [cliPath, "--server", "--provider", provider.rawValue, "--api-model", apiModel]
+    public static func arguments(cliPath: String, provider: TranslationProviderKind, claudeAPIModel: String, openAIModel: String, openAIBaseURL: String = OpenAIBaseURL.default) -> [String] {
+        var arguments = [cliPath, "--server", "--provider", provider.rawValue, "--api-model", claudeAPIModel, "--openai-model", openAIModel]
+        if openAIBaseURL != OpenAIBaseURL.default {
+            arguments += ["--openai-base-url", openAIBaseURL]
+        }
+        return arguments
     }
 
     public static func environment(base: [String: String], secrets: SecretStore) -> [String: String] {

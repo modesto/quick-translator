@@ -8,14 +8,17 @@ private func data(_ string: String) -> Data { Data(string.utf8) }
 struct TranslationProviderKindTests {
     @Test("matches the CLI provider ids")
     func rawValues() {
-        #expect(TranslationProviderKind.allCases.map(\.rawValue) == ["claude-code", "claude-api", "deepl"])
+        #expect(TranslationProviderKind.allCases.map(\.rawValue) == ["claude-code", "claude-api", "openai", "deepl"])
     }
 
     @Test("only the remote providers need a key, each in its own variable")
     func keys() {
         #expect(TranslationProviderKind.claudeCode.keyAccount == nil)
         #expect(TranslationProviderKind.claudeAPI.keyEnvironmentVariable == "QT_ANTHROPIC_API_KEY")
+        #expect(TranslationProviderKind.openAI.keyEnvironmentVariable == "QT_OPENAI_API_KEY")
         #expect(TranslationProviderKind.deepL.keyEnvironmentVariable == "QT_DEEPL_AUTH_KEY")
+        let accounts = TranslationProviderKind.allCases.compactMap(\.keyAccount)
+        #expect(Set(accounts).count == accounts.count)
         #expect(TranslationProviderKind.claudeAPI.keyAccount != TranslationProviderKind.deepL.keyAccount)
     }
 
@@ -24,6 +27,7 @@ struct TranslationProviderKindTests {
         #expect(TranslationProviderKind.claudeCode.keyPage == nil)
         #expect(TranslationProviderKind.deepL.keyPage?.url.absoluteString == "https://www.deepl.com/pro-api")
         #expect(TranslationProviderKind.claudeAPI.keyPage?.url.absoluteString == "https://platform.claude.com/settings/keys")
+        #expect(TranslationProviderKind.openAI.keyPage?.url.absoluteString == "https://platform.openai.com/api-keys")
         for kind in TranslationProviderKind.allCases {
             #expect((kind.keyPage != nil) == (kind.keyAccount != nil))
         }
@@ -37,12 +41,26 @@ struct TranslationProviderKindTests {
     }
 }
 
-@Suite("ClaudeModelOption")
-struct ClaudeModelOptionTests {
+@Suite("ModelOption")
+struct ModelOptionTests {
     @Test("offers the current Claude models with Haiku first")
     func options() {
-        #expect(ClaudeModelOption.all.map(\.id) == ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"])
-        #expect(ClaudeModelOption.default.displayName == "Claude Haiku 5.5")
+        #expect(ModelOption.claude.map(\.id) == ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"])
+        #expect(ModelOption.claude[0].displayName == "Claude Haiku 5.5")
+    }
+
+    @Test("offers the OpenAI models with the fastest first")
+    func openAIOptions() {
+        #expect(ModelOption.openAI.map(\.id) == ["gpt-6-luna", "gpt-6.1-terra", "gpt-6.2-sol"])
+        #expect(ModelOption.openAI.map(\.displayName) == ["GPT-6 Luna", "GPT-6.1 Terra", "GPT-6.2 Sol"])
+    }
+
+    @Test("falls back to the first option for unknown ids")
+    func validated() {
+        #expect(ModelOption.validated("gpt-6.1-terra", in: ModelOption.openAI) == "gpt-6.1-terra")
+        #expect(ModelOption.validated("gpt-4o", in: ModelOption.openAI) == "gpt-6-luna")
+        #expect(ModelOption.validated(nil, in: ModelOption.openAI) == "gpt-6-luna")
+        #expect(ModelOption.validated(nil, in: ModelOption.claude) == "claude-haiku-5-5")
     }
 }
 
@@ -50,18 +68,26 @@ struct ClaudeModelOptionTests {
 struct ServerLaunchTests {
     @Test("starts the server with the chosen provider and Claude API model")
     func arguments() {
-        #expect(ServerLaunch.arguments(cliPath: "/x/cli.js", provider: .deepL, apiModel: "claude-sonnet-5-5")
-            == ["/x/cli.js", "--server", "--provider", "deepl", "--api-model", "claude-sonnet-5-5"])
+        #expect(ServerLaunch.arguments(cliPath: "/x/cli.js", provider: .openAI, claudeAPIModel: "claude-sonnet-5-5", openAIModel: "gpt-6.1-terra")
+            == ["/x/cli.js", "--server", "--provider", "openai", "--api-model", "claude-sonnet-5-5", "--openai-model", "gpt-6.1-terra"])
+    }
+
+    @Test("passes a compatible base URL only when it is not OpenAI's")
+    func baseURLArgument() {
+        let custom = ServerLaunch.arguments(cliPath: "/x", provider: .openAI, claudeAPIModel: "c", openAIModel: "llama3.2", openAIBaseURL: "http://localhost:11434/v1")
+        #expect(custom.suffix(2) == ["--openai-base-url", "http://localhost:11434/v1"])
+        let official = ServerLaunch.arguments(cliPath: "/x", provider: .openAI, claudeAPIModel: "c", openAIModel: "gpt-6-luna", openAIBaseURL: OpenAIBaseURL.default)
+        #expect(!official.contains("--openai-base-url"))
     }
 
     @Test("passes saved keys and drops stale or empty ones")
     func environment() {
-        let secrets = InMemorySecretStore(["anthropic-api-key": "  sk-ant-123 \n", "deepl-auth-key": " "])
+        let secrets = InMemorySecretStore(["anthropic-api-key": "  sk-ant-123 \n", "openai-api-key": "sk-proj", "deepl-auth-key": " "])
         let environment = ServerLaunch.environment(
             base: ["PATH": "/bin", "QT_DEEPL_AUTH_KEY": "old"],
             secrets: secrets
         )
-        #expect(environment == ["PATH": "/bin", "QT_ANTHROPIC_API_KEY": "sk-ant-123"])
+        #expect(environment == ["PATH": "/bin", "QT_ANTHROPIC_API_KEY": "sk-ant-123", "QT_OPENAI_API_KEY": "sk-proj"])
     }
 }
 
@@ -144,5 +170,49 @@ struct ProviderResponseTests {
         let line = try ServerRequest(id: "1", text: "hola", languagePair: .default, provider: .deepL).encodedLine()
         let decoded = try JSONSerialization.jsonObject(with: line.dropLast()) as? [String: String]
         #expect(decoded?["provider"] == "deepl")
+    }
+}
+
+@Suite("OpenAIBaseURL")
+struct OpenAIBaseURLTests {
+    @Test("empty means OpenAI", arguments: ["", "   ", "\n"])
+    func empty(input: String) {
+        #expect(OpenAIBaseURL.normalized(input) == "https://api.openai.com/v1")
+    }
+
+    @Test("keeps http and https URLs without the trailing slash", arguments: [
+        ("http://localhost:11434/v1/", "http://localhost:11434/v1"),
+        (" https://openrouter.ai/api/v1 ", "https://openrouter.ai/api/v1"),
+    ])
+    func valid(input: String, expected: String) {
+        #expect(OpenAIBaseURL.normalized(input) == expected)
+    }
+
+    @Test("rejects anything that is not an http(s) URL", arguments: ["ftp://example.com", "localhost:11434", "not a url", "https://"])
+    func invalid(input: String) {
+        #expect(OpenAIBaseURL.normalized(input) == nil)
+    }
+
+    @Test("tells OpenAI from compatible servers")
+    func official() {
+        #expect(OpenAIBaseURL.isOfficial("https://api.openai.com/v1"))
+        #expect(!OpenAIBaseURL.isOfficial("http://localhost:11434/v1"))
+    }
+}
+
+@Suite("ProviderSetup")
+struct ProviderSetupTests {
+    @Test("OpenAI needs a key only on OpenAI's own server")
+    func openAIKey() {
+        #expect(!ProviderSetup.isReady(.openAI, hasKey: false, openAIBaseURL: OpenAIBaseURL.default))
+        #expect(ProviderSetup.isReady(.openAI, hasKey: true, openAIBaseURL: OpenAIBaseURL.default))
+        #expect(ProviderSetup.isReady(.openAI, hasKey: false, openAIBaseURL: "http://localhost:11434/v1"))
+    }
+
+    @Test("the other providers")
+    func others() {
+        #expect(ProviderSetup.isReady(.claudeCode, hasKey: false, openAIBaseURL: OpenAIBaseURL.default))
+        #expect(!ProviderSetup.isReady(.claudeAPI, hasKey: false, openAIBaseURL: "http://localhost/v1"))
+        #expect(ProviderSetup.isReady(.deepL, hasKey: true, openAIBaseURL: OpenAIBaseURL.default))
     }
 }
