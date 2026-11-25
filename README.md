@@ -117,3 +117,7 @@ With `--server` it stays running, keeps Claude Code warm and answers one JSON re
 - `app/Sources/QuickTranslator/` — the menu bar app.
 
 See [CLAUDE.md](CLAUDE.md) for architecture notes and contribution rules.
+
+## License
+
+[MIT](LICENSE)
