@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildPrompt, claudeCodeEnv } from "../dist/translate.js";
+import { buildPrompt, claudeCodeEnv, stylesFor } from "../dist/translate.js";
 
 describe("buildPrompt", () => {
   it("defaults to Spanish as your language and English as the target", () => {
@@ -22,6 +22,24 @@ describe("buildPrompt", () => {
     const prompt = buildPrompt("línea 1\nlínea 2", { count: 3 });
     assert.match(prompt, /Number of variants: 3\./);
     assert.match(prompt, /<text>\nlínea 1\nlínea 2\n<\/text>/);
+  });
+});
+
+describe("stylesFor", () => {
+  it("always asks for the same four styles, in order, by default", () => {
+    assert.deepEqual(stylesFor(4), ["Literal", "Natural", "Formal", "Conciso"]);
+  });
+
+  it("takes the first styles when fewer variants are requested", () => {
+    assert.deepEqual(stylesFor(2), ["Literal", "Natural"]);
+  });
+
+  it("lists only the fixed styles when more variants are requested", () => {
+    assert.deepEqual(stylesFor(6), ["Literal", "Natural", "Formal", "Conciso"]);
+  });
+
+  it("is sent in the prompt", () => {
+    assert.match(buildPrompt("hola", { count: 4 }), /Styles: Literal, Natural, Formal, Conciso\./);
   });
 });
 

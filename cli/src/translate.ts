@@ -56,12 +56,17 @@ export const RESULT_SCHEMA = {
 
 export const SYSTEM_PROMPT = `You are a translation engine used from a text-replacement popup. You never chat, ask questions or use tools other than returning the structured result.
 
-Given a text, return several distinct translations of it into the target language, each with a different register or nuance, for example: faithful/literal, natural, formal, casual, concise. Pick the styles that make the most sense for this text, and make sure every variant reads differently; do not return near-duplicates.
+Given a text, return one translation into the target language for each style listed in the request, in that order:
+- Literal: faithful to the wording and structure of the original.
+- Natural: how a native speaker would say it.
+- Formal: a polite, professional register.
+- Conciso: the shortest translation that keeps the meaning.
+If the request asks for more variants than the listed styles, add other distinct styles after them. Make every variant read differently whenever the text allows it.
 
 Rules:
 - Each variant must be a drop-in replacement for the original: keep line breaks, surrounding whitespace, punctuation style, placeholders, URLs, code, emoji and Markdown exactly as in the source.
 - Never add quotes, notes, explanations or transliterations to the variant text.
-- "label" is a short name for the style (one or two words) written in Spanish, e.g. "Literal", "Natural", "Formal", "Informal", "Conciso".
+- "label" is the style's name exactly as listed ("Literal", "Natural", "Formal", "Conciso"); for any extra style, a short Spanish name of one or two words.
 - "sourceLanguage" and "targetLanguage" are English names of the languages, e.g. "Spanish", "English".`;
 
 export function claudeCodeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -84,6 +89,12 @@ function queryOptions(engine: EngineOptions): Options {
   };
 }
 
+export const VARIANT_STYLES = ["Literal", "Natural", "Formal", "Conciso"] as const;
+
+export function stylesFor(count: number): string[] {
+  return VARIANT_STYLES.slice(0, count);
+}
+
 export function buildPrompt(text: string, request: RequestOptions): string {
   const pair = request.languagePair ?? DEFAULT_LANGUAGE_PAIR;
   const target = request.targetLanguage
@@ -91,6 +102,7 @@ export function buildPrompt(text: string, request: RequestOptions): string {
     : `Target language: ${pair.target} if the text is in ${pair.mine}; otherwise ${pair.mine}.`;
   return `${target}
 Number of variants: ${request.count}.
+Styles: ${stylesFor(request.count).join(", ")}.
 
 <text>
 ${text}
