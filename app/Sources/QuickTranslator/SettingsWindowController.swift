@@ -23,6 +23,9 @@ final class SettingsModel: ObservableObject {
     @Published var keyDrafts: [TranslationProviderKind: String] = [:]
     @Published var savedKeys: Set<TranslationProviderKind> = []
     @Published var testState: TestState = .idle
+    @Published var launchesAtLogin = false
+    @Published var launchNeedsApproval = false
+    @Published var launchAtLoginError: String?
     @Published private(set) var uiLanguage = L10n.language
 
     var onUILanguageChange: (() -> Void)?
@@ -32,6 +35,7 @@ final class SettingsModel: ObservableObject {
     private let settings: AppSettings
     private let secrets: SecretStore
     private let translator: Translator
+    private let launchAtLogin = LaunchAtLogin(service: MainAppLoginItem())
     private let onLanguagePairChange: () -> Void
 
     init(settings: AppSettings, secrets: SecretStore, translator: Translator, shortcut: ShortcutRecorderModel, onLanguagePairChange: @escaping () -> Void) {
@@ -49,6 +53,22 @@ final class SettingsModel: ObservableObject {
         automatic = settings.automaticClaude
         languagePair = settings.languagePair
         reloadKeys()
+        reloadLaunchAtLogin()
+    }
+
+    func reloadLaunchAtLogin() {
+        launchesAtLogin = launchAtLogin.isEnabled
+        launchNeedsApproval = launchAtLogin.needsApproval
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            try launchAtLogin.setEnabled(enabled)
+            launchAtLoginError = nil
+        } catch {
+            launchAtLoginError = L10n.strings.launchAtLoginFailed(error.localizedDescription)
+        }
+        reloadLaunchAtLogin()
     }
 
     func reloadKeys() {
@@ -180,6 +200,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         self.window = window
         recorder.refresh()
         model.reloadKeys()
+        model.reloadLaunchAtLogin()
         SettingsTabSelection.shared.tab = tab
         if !window.isVisible { window.center() }
         NSApp.setActivationPolicy(.regular)
@@ -257,6 +278,7 @@ private struct GeneralSettingsView: View {
             Section(L10n.strings.shortcutSection) {
                 ShortcutRecorderView(model: model.shortcut)
             }
+            LaunchAtLoginSection(model: model)
             Section {
                 Picker(L10n.strings.myLanguage, selection: Binding(get: { model.languagePair.mine }, set: model.setMine)) {
                     ForEach(Self.codes, id: \.self) { Text(Languages.displayName(forCode: $0)).tag($0) }
@@ -273,6 +295,27 @@ private struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct LaunchAtLoginSection: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        Section {
+            Toggle(L10n.strings.launchAtLogin, isOn: Binding(get: { model.launchesAtLogin }, set: model.setLaunchAtLogin))
+            if model.launchNeedsApproval {
+                Button(L10n.strings.openLoginItems, action: MainAppLoginItem.openSystemSettings)
+            }
+        } header: {
+            Text(L10n.strings.startupSection)
+        } footer: {
+            if let message = model.launchAtLoginError ?? (model.launchNeedsApproval ? L10n.strings.launchAtLoginApproval : nil) {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
 

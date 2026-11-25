@@ -82,6 +82,11 @@ public struct UIStrings: Sendable {
     public let targetLanguage: String
     public let languagesSection: String
     public let languagesFooter: String
+    public let startupSection: String
+    public let launchAtLogin: String
+    public let launchAtLoginApproval: String
+    public let openLoginItems: String
+    public let launchAtLoginFailed: Format
     public let provider: String
     public let translateAutomatically: String
     public let variantsSection: String
@@ -182,6 +187,11 @@ extension UIStrings {
         targetLanguage: "Idioma destino",
         languagesSection: "Idiomas",
         languagesFooter: "Lo que esté en tu idioma se traduce al destino; cualquier otro idioma, al tuyo. La app se muestra en tu idioma.",
+        startupSection: "Inicio",
+        launchAtLogin: "Abrir al iniciar sesión",
+        launchAtLoginApproval: "Falta permitirlo en Ajustes del Sistema → General → Ítems de inicio.",
+        openLoginItems: "Abrir Ítems de inicio…",
+        launchAtLoginFailed: { "No se ha podido cambiar: \($0)" },
         provider: "Proveedor",
         translateAutomatically: "Traducir automáticamente",
         variantsSection: "Varias versiones",
@@ -279,6 +289,11 @@ extension UIStrings {
         targetLanguage: "Target language",
         languagesSection: "Languages",
         languagesFooter: "Text in your language is translated into the target; text in any other language, into yours. The app is shown in your language.",
+        startupSection: "Startup",
+        launchAtLogin: "Open at login",
+        launchAtLoginApproval: "Still needs your approval in System Settings → General → Login Items.",
+        openLoginItems: "Open Login Items…",
+        launchAtLoginFailed: { "Couldn’t change it: \($0)" },
         provider: "Provider",
         translateAutomatically: "Translate automatically",
         variantsSection: "Several versions",
@@ -376,6 +391,11 @@ extension UIStrings {
         targetLanguage: "Langue cible",
         languagesSection: "Langues",
         languagesFooter: "Le texte dans votre langue est traduit dans la langue cible ; tout autre texte, dans la vôtre. L’app s’affiche dans votre langue.",
+        startupSection: "Démarrage",
+        launchAtLogin: "Ouvrir à l’ouverture de session",
+        launchAtLoginApproval: "Doit encore être autorisé dans Réglages Système → Général → Ouverture.",
+        openLoginItems: "Ouvrir les éléments d’ouverture…",
+        launchAtLoginFailed: { "Impossible de le modifier : \($0)" },
         provider: "Fournisseur",
         translateAutomatically: "Traduire automatiquement",
         variantsSection: "Plusieurs versions",
@@ -473,6 +493,11 @@ extension UIStrings {
         targetLanguage: "Zielsprache",
         languagesSection: "Sprachen",
         languagesFooter: "Text in deiner Sprache wird in die Zielsprache übersetzt, Text in jeder anderen Sprache in deine. Die App wird in deiner Sprache angezeigt.",
+        startupSection: "Start",
+        launchAtLogin: "Beim Anmelden öffnen",
+        launchAtLoginApproval: "Muss noch in Systemeinstellungen → Allgemein → Anmeldeobjekte erlaubt werden.",
+        openLoginItems: "Anmeldeobjekte öffnen …",
+        launchAtLoginFailed: { "Konnte nicht geändert werden: \($0)" },
         provider: "Anbieter",
         translateAutomatically: "Automatisch übersetzen",
         variantsSection: "Mehrere Versionen",
@@ -570,6 +595,11 @@ extension UIStrings {
         targetLanguage: "Lingua di destinazione",
         languagesSection: "Lingue",
         languagesFooter: "Il testo nella tua lingua viene tradotto nella lingua di destinazione; qualsiasi altra lingua, nella tua. L’app viene mostrata nella tua lingua.",
+        startupSection: "Avvio",
+        launchAtLogin: "Apri al login",
+        launchAtLoginApproval: "Va ancora consentito in Impostazioni di Sistema → Generali → Elementi login.",
+        openLoginItems: "Apri Elementi login…",
+        launchAtLoginFailed: { "Impossibile modificarlo: \($0)" },
         provider: "Fornitore",
         translateAutomatically: "Traduci automaticamente",
         variantsSection: "Più versioni",
@@ -667,6 +697,11 @@ extension UIStrings {
         targetLanguage: "Idioma de destino",
         languagesSection: "Idiomas",
         languagesFooter: "O texto no seu idioma é traduzido para o destino; qualquer outro idioma, para o seu. A app é mostrada no seu idioma.",
+        startupSection: "Início",
+        launchAtLogin: "Abrir ao iniciar sessão",
+        launchAtLoginApproval: "Ainda precisa ser permitido em Ajustes do Sistema → Geral → Itens de Início.",
+        openLoginItems: "Abrir Itens de Início…",
+        launchAtLoginFailed: { "Não foi possível alterar: \($0)" },
         provider: "Fornecedor",
         translateAutomatically: "Traduzir automaticamente",
         variantsSection: "Várias versões",

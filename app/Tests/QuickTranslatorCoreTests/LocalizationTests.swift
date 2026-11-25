@@ -24,6 +24,7 @@ struct LocalizationTests {
         #expect(strings.languageMissingMessage("A1", "B2").contains("A1"))
         #expect(strings.languageMissingMessage("A1", "B2").contains("B2"))
         #expect(strings.notInstalled("A1", "B2").contains("B2"))
+        #expect(strings.launchAtLoginFailed("boom").contains("boom"))
     }
 
     @Test("each language is actually translated", arguments: UILanguage.allCases.filter { $0 != .es })
@@ -33,6 +34,7 @@ struct LocalizationTests {
         #expect(strings.translateSelection != spanish.translateSelection)
         #expect(strings.languagesFooter != spanish.languagesFooter)
         #expect(strings.testSentence != spanish.testSentence)
+        #expect(strings.launchAtLogin != spanish.launchAtLogin)
     }
 
     @Test("names languages in the app language", arguments: [

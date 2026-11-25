@@ -57,6 +57,7 @@ pwsh scripts/build-windows.ps1 -Install                  # build, install and re
 - DeepL picks the free or paid endpoint from the key (`:fx`), asks for formal and informal versions in parallel when the target supports formality, and detects the source itself: if the text is not in "mine", it translates again into "mine".
 - The warm Claude Code process uses about 270 MB while idle.
 - UI language: `UILanguage.forLanguage(languagePair.mine)`, English when "mine" has no translation. `L10n.language` is set at launch and when "mine" changes; the Settings view rebuilds with `.id(model.uiLanguage)` and the menus are rebuilt. Language names use the UI language: `Languages.displayName` (capitalized, for lists) and `Languages.name` (as written mid-sentence). The Services menu entry comes from `Info.plist` and stays in Spanish.
+- "Open at login" (General tab) uses `SMAppService.mainApp` behind `LoginItemService`; `LaunchAtLogin` treats `requiresApproval` as on and Settings then offers to open Login Items.
 - The app runs as an accessory (no Dock icon, no menu bar), so it installs a hidden main menu with an Edit menu (`EditMenu`): without it ⌘V/⌘C in text fields only beep. The Settings window switches the app to `.regular` while open so it comes to the front, and back to `.accessory` when closed.
 
 ## Windows app
