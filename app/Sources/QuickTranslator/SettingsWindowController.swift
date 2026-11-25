@@ -53,7 +53,7 @@ final class SettingsModel: ObservableObject {
 
     func reloadKeys() {
         savedKeys = Set(TranslationProviderKind.allCases.filter { kind in
-            kind.keyAccount.flatMap(secrets.secret(for:)).map { !$0.isEmpty } ?? false
+            kind.keyAccount.map(secrets.hasSecret(for:)) ?? false
         })
         keyDrafts = [:]
     }

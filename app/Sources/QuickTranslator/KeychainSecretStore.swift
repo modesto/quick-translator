@@ -18,6 +18,13 @@ final class KeychainSecretStore: SecretStore {
         return String(data: data, encoding: .utf8)
     }
 
+    func hasSecret(for account: String) -> Bool {
+        var query = baseQuery(account)
+        query[kSecReturnAttributes as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+    }
+
     func setSecret(_ value: String?, for account: String) {
         SecItemDelete(baseQuery(account) as CFDictionary)
         guard let value, !value.isEmpty else { return }

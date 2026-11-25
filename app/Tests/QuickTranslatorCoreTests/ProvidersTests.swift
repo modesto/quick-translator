@@ -80,14 +80,35 @@ struct ServerLaunchTests {
         #expect(!official.contains("--openai-base-url"))
     }
 
-    @Test("passes saved keys and drops stale or empty ones")
+    @Test("passes only the active provider's key and drops stale ones")
     func environment() {
-        let secrets = InMemorySecretStore(["anthropic-api-key": "  sk-ant-123 \n", "openai-api-key": "sk-proj", "deepl-auth-key": " "])
+        let secrets = InMemorySecretStore(["anthropic-api-key": "  sk-ant-123 \n", "openai-api-key": "sk-proj", "deepl-auth-key": "dl"])
         let environment = ServerLaunch.environment(
             base: ["PATH": "/bin", "QT_DEEPL_AUTH_KEY": "old"],
-            secrets: secrets
+            secrets: secrets,
+            provider: .claudeAPI
         )
-        #expect(environment == ["PATH": "/bin", "QT_ANTHROPIC_API_KEY": "sk-ant-123", "QT_OPENAI_API_KEY": "sk-proj"])
+        #expect(environment == ["PATH": "/bin", "QT_ANTHROPIC_API_KEY": "sk-ant-123"])
+        #expect(secrets.readAccounts == ["anthropic-api-key"])
+    }
+
+    @Test("drops an empty key")
+    func emptyKey() {
+        let secrets = InMemorySecretStore(["deepl-auth-key": " "])
+        let environment = ServerLaunch.environment(base: ["PATH": "/bin"], secrets: secrets, provider: .deepL)
+        #expect(environment == ["PATH": "/bin"])
+    }
+
+    @Test("reads no key for Claude Code, which uses the Claude login")
+    func claudeCodeReadsNoKey() {
+        let secrets = InMemorySecretStore(["anthropic-api-key": "sk-ant", "openai-api-key": "sk-proj"])
+        let environment = ServerLaunch.environment(
+            base: ["PATH": "/bin", "QT_ANTHROPIC_API_KEY": "old"],
+            secrets: secrets,
+            provider: .claudeCode
+        )
+        #expect(environment == ["PATH": "/bin"])
+        #expect(secrets.readAccounts.isEmpty)
     }
 }
 

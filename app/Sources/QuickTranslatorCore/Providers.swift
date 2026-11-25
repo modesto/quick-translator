@@ -129,6 +129,7 @@ public enum ProviderSetup {
 
 public protocol SecretStore: AnyObject {
     func secret(for account: String) -> String?
+    func hasSecret(for account: String) -> Bool
     func setSecret(_ value: String?, for account: String)
 }
 
@@ -139,7 +140,14 @@ public final class InMemorySecretStore: SecretStore {
         self.values = values
     }
 
-    public func secret(for account: String) -> String? { values[account] }
+    public private(set) var readAccounts: [String] = []
+
+    public func secret(for account: String) -> String? {
+        readAccounts.append(account)
+        return values[account]
+    }
+
+    public func hasSecret(for account: String) -> Bool { !(values[account] ?? "").isEmpty }
 
     public func setSecret(_ value: String?, for account: String) {
         values[account] = value
@@ -155,11 +163,12 @@ public enum ServerLaunch {
         return arguments
     }
 
-    public static func environment(base: [String: String], secrets: SecretStore) -> [String: String] {
+    public static func environment(base: [String: String], secrets: SecretStore, provider active: TranslationProviderKind) -> [String: String] {
         var environment = base
         for provider in TranslationProviderKind.allCases {
             guard let variable = provider.keyEnvironmentVariable else { continue }
-            if let account = provider.keyAccount,
+            if provider == active,
+               let account = provider.keyAccount,
                let key = secrets.secret(for: account)?.trimmingCharacters(in: .whitespacesAndNewlines),
                !key.isEmpty {
                 environment[variable] = key
