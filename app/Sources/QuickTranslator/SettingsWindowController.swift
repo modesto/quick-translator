@@ -82,7 +82,7 @@ final class SettingsModel: ObservableObject {
     }
 
     var isProviderReady: Bool {
-        ProviderSetup.isReady(provider, hasKey: savedKeys.contains(provider), openAIBaseURL: openAIBaseURL)
+        ProviderSetup.isReady(provider, hasKey: savedKeys.contains(provider), openAIBaseURL: openAIBaseURL, openAIModel: openAIModel)
     }
 
     func saveOpenAIBaseURL() {
@@ -95,6 +95,8 @@ final class SettingsModel: ObservableObject {
         guard normalized != settings.openAIBaseURL else { return }
         settings.openAIBaseURL = normalized
         openAIBaseURL = normalized
+        openAIModel = settings.openAIModel
+        openAIModelDraft = openAIModel
         testState = .idle
         translator.restart()
     }
@@ -372,7 +374,7 @@ private struct OpenAIModelField: View {
 
     var body: some View {
         HStack {
-            TextField("Modelo", text: $model.openAIModelDraft)
+            TextField("Modelo", text: $model.openAIModelDraft, prompt: Text("Nombre del modelo, p. ej. llama3.2"))
                 .onSubmit { model.selectOpenAIModel(model.openAIModelDraft) }
             Menu {
                 ForEach(ModelOption.openAI) { option in

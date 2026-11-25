@@ -110,6 +110,20 @@ struct AppSettingsTests {
         #expect(AppSettings(defaults: defaults).openAIModel == "gpt-6-luna")
     }
 
+    @Test("keeps one model for OpenAI and another for the compatible server")
+    func modelPerEndpoint() {
+        let defaults = Self.freshDefaults()
+        let settings = AppSettings(defaults: defaults)
+        settings.openAIModel = "gpt-6.1-terra"
+        settings.openAIBaseURL = "http://localhost:11434/v1"
+        #expect(settings.openAIModel == "")
+        settings.openAIModel = "llama3.2"
+        settings.openAIBaseURL = ""
+        #expect(AppSettings(defaults: defaults).openAIModel == "gpt-6.1-terra")
+        settings.openAIBaseURL = "http://localhost:11434/v1"
+        #expect(AppSettings(defaults: defaults).openAIModel == "llama3.2")
+    }
+
     @Test("uses OpenAI's URL by default and when the field is left empty")
     func openAIBaseURL() {
         let defaults = Self.freshDefaults()

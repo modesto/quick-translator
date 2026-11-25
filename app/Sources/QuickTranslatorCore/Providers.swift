@@ -85,6 +85,7 @@ public enum OpenAIBaseURL {
         if trimmed.isEmpty { return Self.default }
         guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https", url.host?.isEmpty == false else { return nil }
+        if isOfficial(trimmed), url.path.isEmpty { return Self.default }
         return trimmed
     }
 
@@ -94,10 +95,12 @@ public enum OpenAIBaseURL {
 }
 
 public enum ProviderSetup {
-    public static func isReady(_ provider: TranslationProviderKind, hasKey: Bool, openAIBaseURL: String) -> Bool {
+    public static func isReady(_ provider: TranslationProviderKind, hasKey: Bool, openAIBaseURL: String, openAIModel: String) -> Bool {
         switch provider {
         case .claudeCode: return true
-        case .openAI: return hasKey || !OpenAIBaseURL.isOfficial(openAIBaseURL)
+        case .openAI:
+            if OpenAIBaseURL.isOfficial(openAIBaseURL) { return hasKey }
+            return !openAIModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .claudeAPI, .deepL: return hasKey
         }
     }

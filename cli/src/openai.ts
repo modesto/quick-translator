@@ -16,7 +16,7 @@ export interface OpenAIEndpoint {
 /** OpenAI itself gets the Responses API; compatible servers (Ollama, OpenRouter, Groq…) only reliably speak Chat Completions. */
 export function openAIEndpoint(baseURL: string | undefined): OpenAIEndpoint {
   const trimmed = (baseURL ?? "").trim().replace(/\/+$/, "").replace(/\/(responses|chat\/completions)$/, "");
-  const base = trimmed || DEFAULT_OPENAI_BASE_URL;
+  let base = trimmed || DEFAULT_OPENAI_BASE_URL;
   let parsed: URL;
   try {
     parsed = new URL(base);
@@ -27,21 +27,26 @@ export function openAIEndpoint(baseURL: string | undefined): OpenAIEndpoint {
     throw new ProviderError("provider_error", `Invalid OpenAI base URL: ${base}`);
   }
   const official = parsed.hostname === "api.openai.com";
+  if (official && parsed.pathname === "/") base = DEFAULT_OPENAI_BASE_URL;
   return official ? { url: `${base}/responses`, api: "responses", official } : { url: `${base}/chat/completions`, api: "chat", official };
 }
 
-const MODELS_WITHOUT_NO_REASONING = /^gpt-6(\.\d+)?-(astra|sol)/;
+const MODELS_WITH_NO_REASONING = /^gpt-6(\.\d+)?-(luna|terra)/;
+const REASONING_MODELS = /^(gpt-[5-9]|o\d)/;
 
-export function reasoningEffort(model: string): "none" | "low" {
-  return MODELS_WITHOUT_NO_REASONING.test(model) ? "low" : "none";
+export function reasoningEffort(model: string): "none" | "low" | undefined {
+  if (MODELS_WITH_NO_REASONING.test(model)) return "none";
+  if (REASONING_MODELS.test(model)) return "low";
+  return undefined;
 }
 
 export function openAIRequestBody(model: string, text: string, request: RequestOptions): Record<string, unknown> {
+  const effort = reasoningEffort(model);
   return {
     model,
     instructions: SYSTEM_PROMPT,
     input: buildPrompt(text, request),
-    reasoning: { effort: reasoningEffort(model) },
+    ...(effort ? { reasoning: { effort } } : {}),
     store: false,
     text: { format: { type: "json_schema", name: "translation", schema: RESULT_SCHEMA, strict: true } },
   };
@@ -146,8 +151,13 @@ export class OpenAITranslator implements TranslationProvider {
     } catch {
       throw new ProviderError("network", `Could not reach ${endpoint.url}`);
     }
-    if (!response.ok) throw openAIErrorFromResponse(response.status, await response.text());
-    const json = await response.json();
+    if (!response.ok) throw openAIErrorFromResponse(response.status, await response.text().catch(() => ""));
+    let json: unknown;
+    try {
+      json = await response.json();
+    } catch {
+      throw new ProviderError("provider_error", `${endpoint.url} did not return JSON`);
+    }
     return endpoint.api === "responses" ? resultFromResponse(json as ResponseBody) : resultFromChat(json as ChatBody);
   }
 

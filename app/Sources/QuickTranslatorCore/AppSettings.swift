@@ -8,6 +8,7 @@ public final class AppSettings {
     public static let claudeAPIModelKey = "claudeAPIModel"
     public static let openAIModelKey = "openAIModel"
     public static let openAIBaseURLKey = "openAIBaseURL"
+    public static let compatibleModelKey = "openAICompatibleModel"
 
     private let defaults: UserDefaults
 
@@ -27,10 +28,15 @@ public final class AppSettings {
 
     public var openAIModel: String {
         get {
-            let stored = defaults.string(forKey: Self.openAIModelKey)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return stored.isEmpty ? ModelOption.openAI[0].id : stored
+            let official = OpenAIBaseURL.isOfficial(openAIBaseURL)
+            let stored = defaults.string(forKey: official ? Self.openAIModelKey : Self.compatibleModelKey)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return stored.isEmpty && official ? ModelOption.openAI[0].id : stored
         }
-        set { defaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Self.openAIModelKey) }
+        set {
+            let key = OpenAIBaseURL.isOfficial(openAIBaseURL) ? Self.openAIModelKey : Self.compatibleModelKey
+            defaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: key)
+        }
     }
 
     public var openAIBaseURL: String {

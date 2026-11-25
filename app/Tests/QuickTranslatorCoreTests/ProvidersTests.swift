@@ -183,6 +183,8 @@ struct OpenAIBaseURLTests {
     @Test("keeps http and https URLs without the trailing slash", arguments: [
         ("http://localhost:11434/v1/", "http://localhost:11434/v1"),
         (" https://openrouter.ai/api/v1 ", "https://openrouter.ai/api/v1"),
+        ("https://api.openai.com", "https://api.openai.com/v1"),
+        ("https://api.openai.com/", "https://api.openai.com/v1"),
     ])
     func valid(input: String, expected: String) {
         #expect(OpenAIBaseURL.normalized(input) == expected)
@@ -204,15 +206,20 @@ struct OpenAIBaseURLTests {
 struct ProviderSetupTests {
     @Test("OpenAI needs a key only on OpenAI's own server")
     func openAIKey() {
-        #expect(!ProviderSetup.isReady(.openAI, hasKey: false, openAIBaseURL: OpenAIBaseURL.default))
-        #expect(ProviderSetup.isReady(.openAI, hasKey: true, openAIBaseURL: OpenAIBaseURL.default))
-        #expect(ProviderSetup.isReady(.openAI, hasKey: false, openAIBaseURL: "http://localhost:11434/v1"))
+        #expect(!ProviderSetup.isReady(.openAI, hasKey: false, openAIBaseURL: OpenAIBaseURL.default, openAIModel: "gpt-6-luna"))
+        #expect(ProviderSetup.isReady(.openAI, hasKey: true, openAIBaseURL: OpenAIBaseURL.default, openAIModel: "gpt-6-luna"))
+        #expect(ProviderSetup.isReady(.openAI, hasKey: false, openAIBaseURL: "http://localhost:11434/v1", openAIModel: "llama3.2"))
+    }
+
+    @Test("a compatible server needs a model name")
+    func compatibleModel() {
+        #expect(!ProviderSetup.isReady(.openAI, hasKey: true, openAIBaseURL: "http://localhost:11434/v1", openAIModel: " "))
     }
 
     @Test("the other providers")
     func others() {
-        #expect(ProviderSetup.isReady(.claudeCode, hasKey: false, openAIBaseURL: OpenAIBaseURL.default))
-        #expect(!ProviderSetup.isReady(.claudeAPI, hasKey: false, openAIBaseURL: "http://localhost/v1"))
-        #expect(ProviderSetup.isReady(.deepL, hasKey: true, openAIBaseURL: OpenAIBaseURL.default))
+        #expect(ProviderSetup.isReady(.claudeCode, hasKey: false, openAIBaseURL: OpenAIBaseURL.default, openAIModel: ""))
+        #expect(!ProviderSetup.isReady(.claudeAPI, hasKey: false, openAIBaseURL: "http://localhost/v1", openAIModel: ""))
+        #expect(ProviderSetup.isReady(.deepL, hasKey: true, openAIBaseURL: OpenAIBaseURL.default, openAIModel: ""))
     }
 }

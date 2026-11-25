@@ -41,6 +41,14 @@ describe("OpenAI request", () => {
     assert.equal(reasoningEffort("gpt-6.1-terra"), "none");
     assert.equal(reasoningEffort("gpt-6.2-sol"), "low");
     assert.equal(reasoningEffort("gpt-6.2-astra"), "low");
+    assert.equal(reasoningEffort("gpt-5-mini"), "low");
+    assert.equal(reasoningEffort("o4-mini"), "low");
+  });
+
+  it("leaves out reasoning for models that do not reason", () => {
+    assert.equal(reasoningEffort("gpt-4.1-mini"), undefined);
+    assert.equal(reasoningEffort("gpt-4o"), undefined);
+    assert.equal("reasoning" in openAIRequestBody("gpt-4.1-mini", "hola", REQUEST), false);
   });
 
   it("asks for a strict JSON schema with the shared prompt and stores nothing", () => {
@@ -140,6 +148,11 @@ describe("OpenAI-compatible base URL", () => {
     assert.equal(openAIEndpoint("https://api.openai.com/v1/responses").url, "https://api.openai.com/v1/responses");
   });
 
+  it("adds /v1 when OpenAI's host is given without a path", () => {
+    assert.equal(openAIEndpoint("https://api.openai.com").url, "https://api.openai.com/v1/responses");
+    assert.equal(openAIEndpoint("https://api.openai.com/").url, "https://api.openai.com/v1/responses");
+  });
+
   it("rejects URLs that are not http or https", () => {
     assert.throws(() => openAIEndpoint("ftp://example.com/v1"), /Invalid OpenAI base URL/);
     assert.throws(() => openAIEndpoint("not a url"), /Invalid OpenAI base URL/);
@@ -169,6 +182,18 @@ describe("OpenAI-compatible base URL", () => {
     assert.deepEqual(await translator.translate("hola", REQUEST), RESULT);
     assert.equal(calls[0].url, "http://localhost:11434/v1/chat/completions");
     assert.equal(calls[0].headers.Authorization, undefined);
+  });
+
+  it("reports a body that is not JSON as a provider error", async () => {
+    const fetch = async () => ({ ok: true, status: 200, json: async () => JSON.parse("<html>"), text: async () => "<html>" });
+    const translator = new OpenAITranslator("m", undefined, { baseURL: "http://localhost:11434/v1", fetch });
+    await assert.rejects(translator.translate("hola", REQUEST), (error) => error.code === "provider_error" && /did not return JSON/.test(error.message));
+  });
+
+  it("still reports the HTTP status when the error body cannot be read", async () => {
+    const fetch = async () => ({ ok: false, status: 401, json: async () => ({}), text: async () => { throw new Error("aborted"); } });
+    const translator = new OpenAITranslator("gpt-6-luna", "sk", { fetch });
+    await assert.rejects(translator.translate("hola", REQUEST), (error) => error.code === "auth_failed");
   });
 
   it("sends the key to a compatible server when there is one", async () => {
