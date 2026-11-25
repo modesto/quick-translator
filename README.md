@@ -48,7 +48,7 @@ macOS ties the Accessibility permission to the app's signature. Without a certif
    security find-identity -v -p codesigning
    ```
 
-6. Build with it, and add the variable to your shell profile (`~/.zshrc`) so every build uses it:
+6. Build with it, and add the variable to `~/.zshenv` so every build uses it, including builds from non-interactive shells:
 
    ```bash
    export CODESIGN_IDENTITY="Quick Translator Dev"
