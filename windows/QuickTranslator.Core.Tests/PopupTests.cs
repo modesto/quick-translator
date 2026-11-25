@@ -57,6 +57,42 @@ public class PopupPlacementTests
     }
 
     [Fact]
+    public void FlipsAboveASelectionJustAboveTheTaskbarWithoutCrossingIt()
+    {
+        var origin = PopupPlacement.Origin(new PixelSize(440, 420), new PixelRect(300, 1000, 400, 24), [Primary]);
+        Assert.Equal(1000 - PopupPlacement.Gap - 420, origin.Y);
+        Assert.True(origin.Y + 420 <= Primary.WorkArea.Bottom);
+    }
+
+    [Fact]
+    public void ClampKeepsAMovedPopupThatFitsWhereItIs()
+    {
+        Assert.Equal(new PixelPoint(500, 300), PopupPlacement.Clamp(new PixelPoint(500, 300), Size, [Primary]));
+    }
+
+    [Fact]
+    public void ClampPullsAPopupThatGrewPastTheBottomBackAboveTheTaskbar()
+    {
+        var origin = PopupPlacement.Clamp(new PixelPoint(500, 900), Size, [Primary]);
+        Assert.Equal(new PixelPoint(500, 1032 - PopupPlacement.Margin - 300), origin);
+    }
+
+    [Fact]
+    public void ClampKeepsItInsideTheSidesAndPinsATooTallPopupToTheTop()
+    {
+        Assert.Equal(1920 - PopupPlacement.Margin - 440, PopupPlacement.Clamp(new PixelPoint(1700, 100), Size, [Primary]).X);
+        Assert.Equal(PopupPlacement.Margin, PopupPlacement.Clamp(new PixelPoint(-50, 100), Size, [Primary]).X);
+        Assert.Equal(PopupPlacement.Margin, PopupPlacement.Clamp(new PixelPoint(100, 100), new PixelSize(440, 2000), [Primary]).Y);
+    }
+
+    [Fact]
+    public void ClampUsesTheMonitorThePopupWasMovedTo()
+    {
+        var origin = PopupPlacement.Clamp(new PixelPoint(3000, 1100), Size, [Primary, Right], Primary, scale: 2);
+        Assert.Equal(new PixelPoint(3000, -200 + 1392 - PopupPlacement.Margin * 2 - 300), origin);
+    }
+
+    [Fact]
     public void ScalesTheMarginAndGapToTheMonitor()
     {
         var origin = PopupPlacement.Origin(Size, new PixelRect(0, 100, 50, 20), [Primary], scale: 1.5);

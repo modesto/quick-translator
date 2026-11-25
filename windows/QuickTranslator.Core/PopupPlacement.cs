@@ -45,4 +45,20 @@ public static class PopupPlacement
         var x = Math.Min(Math.Max(anchor.Left, work.Left + margin), work.Right - margin - size.Width);
         return new PixelPoint(Math.Max(x, work.Left + margin), Math.Max(y, work.Top + margin));
     }
+
+    /// Keeps a popup the user moved inside the work area of the monitor that holds most of it, for example when it
+    /// grows after the translation arrives. Too tall a popup is pinned to the top.
+    public static PixelPoint Clamp(PixelPoint origin, PixelSize size, IReadOnlyList<ScreenArea> screens, ScreenArea? primary = null, double scale = 1)
+    {
+        var margin = Margin * scale;
+        var centerX = origin.X + size.Width / 2;
+        var centerY = origin.Y + size.Height / 2;
+        var screen = screens.FirstOrDefault(screen => screen.Bounds.Contains(centerX, centerY))
+            ?? screens.FirstOrDefault(screen => screen.Bounds.Contains(origin.X, origin.Y))
+            ?? primary ?? screens.FirstOrDefault();
+        var work = screen?.WorkArea ?? FallbackWorkArea;
+        var x = Math.Max(Math.Min(origin.X, work.Right - margin - size.Width), work.Left + margin);
+        var y = Math.Max(Math.Min(origin.Y, work.Bottom - margin - size.Height), work.Top + margin);
+        return new PixelPoint(x, y);
+    }
 }

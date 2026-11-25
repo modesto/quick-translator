@@ -17,6 +17,7 @@ public partial class PopupWindow : Window
     private TranslationProviderKind provider;
     private string? targetOverride;
     private PixelRect anchor;
+    private bool movedByUser;
 
     public PopupWindow()
     {
@@ -36,6 +37,7 @@ public partial class PopupWindow : Window
     public void ShowLoading(string original, PixelRect anchor, TranslationProviderKind provider)
     {
         this.anchor = anchor;
+        movedByUser = false;
         this.provider = provider;
         targetOverride = null;
         state = new ProviderState.Loading();
@@ -184,29 +186,61 @@ public partial class PopupWindow : Window
 
     private void OnSettingsClick(object sender, RoutedEventArgs e) => OpenSettings?.Invoke();
 
+    /// Drags the popup from anywhere on the card except its buttons.
     private void OnDrag(object sender, MouseButtonEventArgs e)
     {
-        if (e.ButtonState == MouseButtonState.Pressed && e.OriginalSource is Border) DragMove();
+        if (e.ButtonState != MouseButtonState.Pressed || IsInsideButton(e.OriginalSource as DependencyObject)) return;
+        DragMove();
+        movedByUser = true;
+        Place();
     }
 
-    /// Positions the card (the window minus its shadow margin) next to the selection, in physical pixels.
+    private static bool IsInsideButton(DependencyObject? element)
+    {
+        while (element is not null)
+        {
+            if (element is System.Windows.Controls.Primitives.ButtonBase) return true;
+            element = element is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(element)
+                : LogicalTreeHelper.GetParent(element);
+        }
+        return false;
+    }
+
+    /// Positions the card (the window minus its shadow margin) next to the selection, in physical pixels, or keeps
+    /// it where the user moved it. Runs again whenever the popup grows, so it never ends up below the taskbar.
     private void Place()
     {
         if (!IsVisible) return;
         var handle = new WindowInteropHelper(this).Handle;
         if (handle == IntPtr.Zero || !GetWindowRect(handle, out var rect)) return;
 
-        var targetScale = ScaleAt(anchor.X + anchor.Width / 2, anchor.Y + anchor.Height / 2);
-        var currentScale = VisualTreeHelper.GetDpi(this).DpiScaleX;
-        var factor = targetScale / currentScale;
-        var margin = ShadowMargin * targetScale;
-        var card = new PixelSize((rect.Right - rect.Left) * factor - 2 * margin, (rect.Bottom - rect.Top) * factor - 2 * margin);
-
+        // The size comes from WPF's layout, in device-independent units: the window rectangle lags behind while
+        // the popup grows from "Translating…" to the variants.
         var screens = System.Windows.Forms.Screen.AllScreens.Select(Area).ToList();
         var primary = System.Windows.Forms.Screen.PrimaryScreen is { } main ? Area(main) : null;
-        var origin = PopupPlacement.Origin(card, anchor, screens, primary, targetScale);
-        SetWindowPos(handle, IntPtr.Zero, (int)Math.Round(origin.X - margin), (int)Math.Round(origin.Y - margin), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        PixelPoint origin;
+        double scale;
+        if (movedByUser)
+        {
+            scale = ScaleAt((rect.Left + rect.Right) / 2.0, (rect.Top + rect.Bottom) / 2.0);
+            var current = new PixelPoint(rect.Left + ShadowMargin * scale, rect.Top + ShadowMargin * scale);
+            origin = PopupPlacement.Clamp(current, CardSize(scale), screens, primary, scale);
+        }
+        else
+        {
+            scale = ScaleAt(anchor.X + anchor.Width / 2, anchor.Y + anchor.Height / 2);
+            origin = PopupPlacement.Origin(CardSize(scale), anchor, screens, primary, scale);
+        }
+
+        var x = (int)Math.Round(origin.X - ShadowMargin * scale);
+        var y = (int)Math.Round(origin.Y - ShadowMargin * scale);
+        if (x != rect.Left || y != rect.Top)
+            SetWindowPos(handle, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
+
+    private PixelSize CardSize(double scale) =>
+        new((ActualWidth - 2 * ShadowMargin) * scale, (ActualHeight - 2 * ShadowMargin) * scale);
 
     private static ScreenArea Area(System.Windows.Forms.Screen screen) => new(
         new PixelRect(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height),
