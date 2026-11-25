@@ -32,7 +32,30 @@ This builds the CLI and the app, installs `Quick Translator.app` in `~/Applicati
 1. Allow it in System Settings → Privacy & Security → **Accessibility**. Without this it cannot read or replace the selection.
 2. Optionally, enable the context menu entry in System Settings → Keyboard → Keyboard Shortcuts → Services → Text → *Traducir con Quick Translator*.
 
-To keep the Accessibility permission across rebuilds, sign with a stable code signing certificate (for example a self-signed one created in Keychain Access): `CODESIGN_IDENTITY="My Identity" ./scripts/build-app.sh --install`. Without it the app gets an ad-hoc signature and macOS asks for the permission again after every rebuild.
+### Keep the Accessibility permission across rebuilds
+
+macOS ties the Accessibility permission to the app's signature. Without a certificate the app gets an ad-hoc signature that changes on every build, so macOS asks for the permission again after each rebuild. A self-signed certificate fixes that, and you only create it once:
+
+1. Open **Keychain Access** (`/System/Library/CoreServices/Applications/Keychain Access.app`; in recent macOS versions it is no longer in Utilities).
+2. Choose **Keychain Access → Certificate Assistant → Create a Certificate…**
+3. Enter a name, for example `Quick Translator Dev`. Set **Identity Type** to *Self Signed Root* and **Certificate Type** to *Code Signing*, then click **Create**.
+4. Double-click the new certificate in the *login* keychain, open **Trust** and set **Code Signing** to *Always Trust*. Close the window and enter your password.
+5. Check that it is listed:
+
+   ```bash
+   security find-identity -v -p codesigning
+   ```
+
+6. Build with it, and add the variable to your shell profile (`~/.zshrc`) so every build uses it:
+
+   ```bash
+   export CODESIGN_IDENTITY="Quick Translator Dev"
+   ./scripts/build-app.sh --install
+   ```
+
+The first build may ask whether `codesign` can use the certificate's key; choose **Always Allow**. If the variable is unset, or the certificate is not found, the script falls back to an ad-hoc signature.
+
+The certificate only works on your Mac, which is all a local build needs. To share the app with other people you would need an Apple Developer ID certificate and notarization.
 
 ## Use
 
