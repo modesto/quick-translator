@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="QuickTranslator.Core.Tests/QuickTranslator.Core.Tests.csproj" />
+  <Project Path="QuickTranslator.Core/QuickTranslator.Core.csproj" />
+  <Project Path="QuickTranslator/QuickTranslator.csproj" />
+</Solution>

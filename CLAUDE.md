@@ -1,6 +1,6 @@
 # Quick Translator
 
-macOS menu bar app that translates the selected text in any app and replaces it with the chosen translation. Two providers: Apple Translation (on-device, instant) and Claude (several variants, through the Claude Agent SDK and the user's Claude Code login, no API key).
+macOS menu bar app (with a Windows tray port in `windows/`) that translates the selected text in any app and replaces it with the chosen translation. Two providers: Apple Translation (on-device, instant) and Claude (several variants, through the Claude Agent SDK and the user's Claude Code login, no API key).
 
 ## Layout
 
@@ -11,8 +11,13 @@ macOS menu bar app that translates the selected text in any app and replaces it 
 - `app/` — Swift package, macOS 26+.
   - `Sources/QuickTranslatorCore/` — pure, testable logic: models, popup placement, server line protocol and request routing, choice keys, model names, language rules, settings, language pair, shortcut formatting/validation and `ShortcutManager` (register, fall back, persist) behind the `HotKeyRegistering` protocol.
   - `Sources/QuickTranslator/` — AppKit/SwiftUI glue: menu bar item, Settings window (General and Proveedor tabs), Keychain key storage, global hotkey (default ⌥⌘T, configurable in Settings), macOS Service, Accessibility selection reading, paste-based replacement, popup, Apple Translation, CLI server process.
+- `windows/` — .NET 10 solution for Windows (`QuickTranslator.slnx`; its own `nuget.config` uses only nuget.org).
+  - `QuickTranslator.Core/` — pure, testable logic ported from `QuickTranslatorCore`: models, server protocol and router, providers, settings (`ISettingsStore`, JSON file in `%APPDATA%\QuickTranslator`), language pair, selection text (plus Windows `HTML Format` fragments), shortcut (Win32 virtual keys and `MOD_` flags) and `ShortcutManager`, popup placement (y-down pixels), popup texts, `UIStrings` (`UIStrings.cs`) in the six languages.
+  - `QuickTranslator.Core.Tests/` — xUnit tests.
+  - `QuickTranslator/` — WPF glue (Fluent theme, `ThemeMode="System"`): tray icon (WinForms `NotifyIcon`), `RegisterHotKey` on a message-only window, Ctrl+C/Ctrl+V via `SendInput`, UI Automation for the selection bounds, popup, Settings window, Credential Manager, HKCU Run key, CLI server process.
 - `scripts/build-app.sh` — builds the CLI and the app, writes `Info.plist` and signs the bundle; `--install` copies it to `~/Applications`, refreshes Services and launches it.
-- `scripts/test.sh` — runs both test suites.
+- `scripts/build-windows.ps1` — builds the CLI and the Windows app into `build\windows` and writes `paths.json`; `-Install` copies it to `%LOCALAPPDATA%\Programs\QuickTranslator`, adds a Start menu shortcut and launches it.
+- `scripts/test.sh` — runs the CLI tests, the Swift tests on macOS and the .NET tests when `dotnet` is installed.
 
 ## Commands
 
@@ -21,11 +26,13 @@ macOS menu bar app that translates the selected text in any app and replaces it 
 (cd cli && npm test)               # CLI tests (builds first)
 (cd app && swift test)             # app tests
 ./scripts/build-app.sh --install   # build, install and relaunch the app
+(cd windows && dotnet test QuickTranslator.Core.Tests)   # Windows app tests
+pwsh scripts/build-windows.ps1 -Install                  # build, install and relaunch the Windows app
 ```
 
 ## Rules
 
-- Every new feature or bug fix ships with tests. Put the logic in `QuickTranslatorCore` (Swift) or in an exported, dependency-injected function (TypeScript) so it can be tested without UI, Accessibility or network, then cover it there.
+- Every new feature or bug fix ships with tests. Put the logic in `QuickTranslatorCore` (Swift), `QuickTranslator.Core` (C#) or in an exported, dependency-injected function (TypeScript) so it can be tested without UI, Accessibility or network, then cover it there.
 - Run `./scripts/test.sh` before every commit; all tests must pass.
 - Tests never call Claude or need Accessibility permission. Use fakes for the translator and injected `UserDefaults` for settings.
 - Code, comments, commit messages and docs are in English. User-facing UI strings live only in `UIStrings` (`QuickTranslatorCore/Localization.swift`), in all six UI languages (es, en, fr, de, it, pt); never hard-code them in views or menus. Add every new string to all six.
@@ -51,3 +58,15 @@ macOS menu bar app that translates the selected text in any app and replaces it 
 - The warm Claude Code process uses about 270 MB while idle.
 - UI language: `UILanguage.forLanguage(languagePair.mine)`, English when "mine" has no translation. `L10n.language` is set at launch and when "mine" changes; the Settings view rebuilds with `.id(model.uiLanguage)` and the menus are rebuilt. Language names use the UI language: `Languages.displayName` (capitalized, for lists) and `Languages.name` (as written mid-sentence). The Services menu entry comes from `Info.plist` and stays in Spanish.
 - The app runs as an accessory (no Dock icon, no menu bar), so it installs a hidden main menu with an Edit menu (`EditMenu`): without it ⌘V/⌘C in text fields only beep. The Settings window switches the app to `.regular` while open so it comes to the front, and back to `.accessory` when closed.
+
+## Windows app
+
+- Same features as the Mac app except Apple Translation (Windows has no public on-device translation API) and the macOS Service. The popup shows only the configured provider; keys 1–9 pick a variant.
+- Changes to shared behaviour (protocol, settings, providers, strings) usually belong in both `app/` and `windows/`. On Windows, strings live in `QuickTranslator.Core/UIStrings.cs`, in the same six languages.
+- `paths.json` next to the exe holds `nodePath` and `cliPath`, like `QTNodePath` / `QTCLIPath`. The build script resolves Node with `realpath`, because fnm/nvm shims live in per-shell folders that disappear.
+- Reading the selection: wait until the hotkey modifiers are released (a Ctrl+C sent while Alt is down arrives as Ctrl+Alt+C), snapshot the clipboard, send Ctrl+C, wait for `GetClipboardSequenceNumber` to change, read Unicode text and `HTML Format`, restore the clipboard. The anchor comes from the UI Automation `TextPattern` selection bounds, else the Win32 caret, else the cursor.
+- The app is per-monitor DPI aware (`app.manifest`): screen coordinates are physical pixels and the popup is placed with `SetWindowPos`.
+- "Translate selection" in the tray menu uses the last foreground window of another app (`ForegroundTracker`), because clicking the tray brings the taskbar to the front.
+- The CLI server runs in a job object with kill-on-close, so it and its Claude Code subprocess die with the app even if it crashes.
+- Windows blocks `SendInput` into elevated apps from a non-elevated process.
+- The WPF Fluent theme is experimental (`WPF0001` is suppressed). Use its brushes (`TextFillColorPrimaryBrush`…) through `DynamicResource`, so a missing key never crashes.

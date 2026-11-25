@@ -87,6 +87,24 @@ The certificate only works on your Mac, which is all a local build needs. To sha
 - *Probar* — runs a test translation with the selected provider and shows the time it took or the error.
 - The popup shows how long each provider took, so you can compare them.
 
+## Windows
+
+A Windows version lives in `windows/` (.NET 10, WPF). It works like the Mac app, with these differences:
+
+- No Apple Translation: the popup shows only the configured provider (Claude Code, Claude API, OpenAI or DeepL).
+- The default shortcut is **Ctrl+Alt+T**. It lives in the notification area (tray); click the icon for Settings, right-click for the menu.
+- It reads the selection by sending **Ctrl+C** and pastes with **Ctrl+V**, restoring the clipboard both times. No permission is needed, but Windows does not let it send keys to apps running as administrator unless it runs as administrator too.
+- Keys are stored in Windows Credential Manager; settings in `%APPDATA%\QuickTranslator\settings.json`.
+- Settings → General can open it when you sign in to Windows.
+
+Requirements: Windows 10 or 11, the .NET 10 SDK, Node.js and Claude Code signed in.
+
+```powershell
+./scripts/build-windows.ps1 -Install
+```
+
+This builds the CLI and the app, installs it in `%LOCALAPPDATA%\Programs\QuickTranslator`, adds a Start menu shortcut and launches it. Like on the Mac, it runs `cli/dist/cli.js` from this repo (paths in `paths.json` next to the exe), so rebuild after moving the repo or changing Node.
+
 ## CLI
 
 The app uses `quick-translate`, a small CLI in `cli/` that you can also run on its own:
@@ -110,13 +128,15 @@ With `--server` it stays running, keeps Claude Code warm and answers one JSON re
 ## Development
 
 ```bash
-./scripts/test.sh                  # CLI (node --test) and app (Swift Testing) tests
-./scripts/build-app.sh --install   # rebuild and relaunch the app
+./scripts/test.sh                  # CLI, Swift (on macOS) and .NET (when dotnet is installed) tests
+./scripts/build-app.sh --install   # rebuild and relaunch the Mac app
+./scripts/build-windows.ps1 -Install  # rebuild and relaunch the Windows app
 ```
 
 - `cli/` — TypeScript CLI on the Claude Agent SDK.
 - `app/Sources/QuickTranslatorCore/` — testable logic shared by the app.
 - `app/Sources/QuickTranslator/` — the menu bar app.
+- `windows/QuickTranslator.Core/` — testable logic of the Windows app; `windows/QuickTranslator/` — the tray app.
 
 See [CLAUDE.md](CLAUDE.md) for architecture notes and contribution rules.
 
