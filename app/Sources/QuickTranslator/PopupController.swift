@@ -17,6 +17,8 @@ final class PopupModel: ObservableObject {
     var onOpenProviderSettings: () -> Void = {}
     var onOpenLanguageSettings: () -> Void = {}
     var onSelectTarget: (String?) -> Void = { _ in }
+    var onDrag: () -> Void = {}
+    var onDragEnded: () -> Void = {}
 
     func text(forKey key: Int) -> String? {
         ChoiceKeys.text(forKey: key, apple: apple, claude: claude)
@@ -44,6 +46,8 @@ final class PopupController {
     private let model = PopupModel()
     private var panel: PopupPanel?
     private var anchor: NSRect = .zero
+    private var wasMovedByUser = false
+    private var dragStart: (mouse: NSPoint, origin: NSPoint)?
     private var keyMonitor: Any?
     private var clickMonitor: Any?
 
@@ -60,6 +64,19 @@ final class PopupController {
             self?.close()
             NSWorkspace.shared.open(LanguagePackAdvice.settingsURL)
         }
+        model.onDrag = { [weak self] in self?.drag() }
+        model.onDragEnded = { [weak self] in self?.dragStart = nil }
+    }
+
+    private func drag() {
+        guard let panel else { return }
+        let mouse = NSEvent.mouseLocation
+        guard let start = dragStart else {
+            dragStart = (mouse, panel.frame.origin)
+            return
+        }
+        panel.setFrameOrigin(PopupPlacement.draggedOrigin(from: start.origin, mouseStart: start.mouse, mouse: mouse))
+        wasMovedByUser = true
     }
 
     func showLoading(original: String, anchor: NSRect?, provider: TranslationProviderKind) {
@@ -102,6 +119,7 @@ final class PopupController {
 
     private func present(anchor: NSRect?) {
         self.anchor = anchor ?? NSRect(origin: NSEvent.mouseLocation, size: .zero)
+        wasMovedByUser = false
         let panel = self.panel ?? makePanel()
         self.panel = panel
         resizeToFit()
@@ -121,7 +139,6 @@ final class PopupController {
         panel.hasShadow = true
         panel.level = .popUpMenu
         panel.hidesOnDeactivate = false
-        panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = NSHostingView(rootView: PopupView(model: model).frame(width: Self.width))
         return panel
@@ -131,16 +148,31 @@ final class PopupController {
         guard let panel, let content = panel.contentView else { return }
         content.layoutSubtreeIfNeeded()
         let size = NSSize(width: Self.width, height: content.fittingSize.height)
-        panel.setFrame(NSRect(origin: origin(for: size), size: size), display: true)
+        let origin = wasMovedByUser ? origin(keepingTopOf: panel.frame, for: size) : origin(for: size)
+        panel.setFrame(NSRect(origin: origin, size: size), display: true)
+    }
+
+    private static var screenAreas: [ScreenArea] { NSScreen.screens.map(screenArea) }
+
+    private static func screenArea(_ screen: NSScreen) -> ScreenArea {
+        ScreenArea(frame: screen.frame, visibleFrame: screen.visibleFrame)
+    }
+
+    private func origin(keepingTopOf frame: NSRect, for size: NSSize) -> NSPoint {
+        PopupPlacement.origin(
+            keepingTopOf: frame,
+            for: size,
+            screens: Self.screenAreas,
+            mainScreen: NSScreen.main.map(Self.screenArea)
+        )
     }
 
     private func origin(for size: NSSize) -> NSPoint {
-        let area = { (screen: NSScreen) in ScreenArea(frame: screen.frame, visibleFrame: screen.visibleFrame) }
-        return PopupPlacement.origin(
+        PopupPlacement.origin(
             for: size,
             anchor: anchor,
-            screens: NSScreen.screens.map(area),
-            mainScreen: NSScreen.main.map(area)
+            screens: Self.screenAreas,
+            mainScreen: NSScreen.main.map(Self.screenArea)
         )
     }
 
@@ -200,6 +232,11 @@ private struct PopupView: View {
         .padding(14)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
+        .gesture(
+            DragGesture(minimumDistance: 2)
+                .onChanged { _ in model.onDrag() }
+                .onEnded { _ in model.onDragEnded() }
+        )
     }
 
     private var header: some View {

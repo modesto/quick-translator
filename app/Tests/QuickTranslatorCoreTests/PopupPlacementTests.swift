@@ -80,6 +80,30 @@ struct PopupPlacementTests {
         #expect(origin == CGPoint(x: 700, y: 20 + PopupPlacement.gap))
     }
 
+    @Test("keeps the top edge of a moved popup when it grows")
+    func movedPopupKeepsItsTop() {
+        let moved = CGRect(x: 900, y: 500, width: 440, height: 120)
+        let origin = PopupPlacement.origin(keepingTopOf: moved, for: Self.popup, screens: [Self.laptop])
+        #expect(origin == CGPoint(x: 900, y: 620 - 300))
+    }
+
+    @Test("pushes a moved popup up when growing would cross the bottom margin")
+    func movedPopupStaysAboveTheBottom() {
+        let moved = CGRect(x: 900, y: 40, width: 440, height: 120)
+        let origin = PopupPlacement.origin(keepingTopOf: moved, for: Self.popup, screens: [Self.laptop])
+        #expect(origin == CGPoint(x: 900, y: PopupPlacement.margin))
+    }
+
+    @Test("moves the popup by as much as the mouse moved since the drag began")
+    func dragFollowsTheMouse() {
+        let origin = PopupPlacement.draggedOrigin(
+            from: CGPoint(x: 300, y: 400),
+            mouseStart: CGPoint(x: 350, y: 650),
+            mouse: CGPoint(x: 420, y: 600)
+        )
+        #expect(origin == CGPoint(x: 370, y: 350))
+    }
+
     @Test("converts accessibility coordinates, whose origin is the top-left, to Cocoa ones")
     func accessibilityToCocoa() {
         let rect = PopupPlacement.cocoaRect(fromAccessibility: CGRect(x: 100, y: 50, width: 200, height: 20), primaryScreenHeight: 900)

@@ -35,6 +35,18 @@ public enum PopupPlacement {
         return CGPoint(x: x, y: max(y, visible.minY + margin))
     }
 
+    public static func origin(keepingTopOf frame: CGRect, for size: CGSize, screens: [ScreenArea], mainScreen: ScreenArea? = nil) -> CGPoint {
+        let center = CGPoint(x: frame.midX, y: frame.midY)
+        let screen = screens.first { $0.frame.contains(center) } ?? mainScreen ?? screens.first
+        let visible = screen?.visibleFrame ?? fallbackVisibleFrame
+        let y = max(frame.maxY - size.height, visible.minY + margin)
+        return CGPoint(x: frame.minX, y: min(y, visible.maxY - size.height))
+    }
+
+    public static func draggedOrigin(from windowOrigin: CGPoint, mouseStart: CGPoint, mouse: CGPoint) -> CGPoint {
+        CGPoint(x: windowOrigin.x + mouse.x - mouseStart.x, y: windowOrigin.y + mouse.y - mouseStart.y)
+    }
+
     public static func cocoaRect(fromAccessibility rect: CGRect, primaryScreenHeight: CGFloat) -> CGRect {
         CGRect(x: rect.minX, y: primaryScreenHeight - rect.maxY, width: rect.width, height: rect.height)
     }
